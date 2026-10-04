@@ -372,3 +372,38 @@ body{
 @keyframes blink{50%{opacity:.35}}
 .cd{font-variant-numeric:tabular-nums;color:var(--gold2);font-weight:700}
 .login-av{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)}
+/* ---- REMOTE KILL SWITCH overlay ---- */
+.kill-overlay{z-index:1000;background:rgba(4,6,20,.97);backdrop-filter:blur(8px)}
+.kill-card{border:2px solid rgba(212,175,55,.7);box-shadow:0 0 44px rgba(212,175,55,.25);text-align:center;max-width:340px}
+.kill-card .ov-icon{font-size:2.6rem;margin-bottom:6px}
+.kill-card h2{color:var(--gold);margin:6px 0}
+.kill-card p{line-height:1.55}
+.kill-card .btn.big{font-size:1.1rem;padding:13px 26px;margin-top:12px;width:100%}
+
+/* ---- LIGHT THEME ---- */
+[data-theme="light"]{
+  --navy:#eef1ff; --navy2:#dde4ff; --gold:#b8860b; --gold2:#d4a017;
+  --txt:#1a2040; --mut:#5a648f; --glass:rgba(255,255,255,.72);
+  --green:#1d9e52; --red:#e04444; --purple:#7c3aed; --blue:#1f7ae0;
+}
+[data-theme="light"] body{background:radial-gradient(1200px 600px at 80% -10%,#ffffff 0%,#dfe6ff 55%) fixed}
+[data-theme="light"] #app{background:rgba(255,255,255,.25)}
+[data-theme="light"] .topbar{background:rgba(255,255,255,.92)}
+[data-theme="light"] .glass{box-shadow:0 8px 24px rgba(30,40,90,.12)}
+[data-theme="light"] .opt{background:rgba(255,255,255,.85)}
+
+/* ---- NOTES + SYLLABUS ---- */
+.note-point{display:flex;gap:10px;padding:10px 12px;margin-bottom:8px;background:var(--glass);
+  border:1px solid rgba(255,255,255,.08);border-radius:12px;line-height:1.55}
+.np-n{flex:0 0 26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#1a1405;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px}
+.syl-row{display:flex;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}
+.syl-row:last-child{border-bottom:none}
+.syl-row.done span{text-decoration:line-through;opacity:.55}
+.syl-row input{width:18px;height:18px;accent-color:var(--gold);flex:0 0 18px}
+
+/* ---- DIAGRAMS ---- */
+.diagram-box{display:flex;justify-content:center;margin:12px 0;padding:10px 6px;
+  background:rgba(11,16,48,.55);border:1px solid rgba(212,175,55,.45);
+  border-radius:14px;box-shadow:0 0 16px rgba(212,175,55,.12)}
+.diagram-box svg{max-width:100%;height:auto;display:block}

@@ -9,12 +9,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="questions-gk.js"></script>
-<script src="questions-maths.js"></script>
-<script src="questions-reasoning.js"></script>
-<script src="questions-english.js"></script>
-<script src="questions-bihar.js"></script>
-<script src="questions-ca.js"></script>
+<!-- question banks LAZY load hote hain (app.js: loadBank) — fast boot ke liye -->
+<script src="diagram-renderer.js"></script>
 </head>
 <body>
 
@@ -37,6 +33,16 @@
     <p id="updateNotes">RuhRank का नया वर्ज़न आ गया है।</p>
     <button class="btn gold" id="btnDoUpdate">⬇️ अपडेट करें</button>
     <button class="btn ghost" id="btnLaterUpdate">बाद में</button>
+  </div>
+</div>
+
+<!-- REMOTE KILL SWITCH -->
+<div id="killSwitchOverlay" class="overlay kill-overlay hidden">
+  <div class="ov-card kill-card">
+    <div class="ov-icon">🛠️</div>
+    <h2 id="killTitle">सेवा अस्थायी रूप से बंद है</h2>
+    <p id="killMsg">रखरखाव कार्य चल रहा है। कृपया कुछ समय बाद पुनः प्रयास करें।</p>
+    <button class="btn gold big" id="btnKillRetry">🔄 पुनः प्रयास करें</button>
   </div>
 </div>
 
@@ -81,6 +87,7 @@
     <header class="topbar">
       <div class="brand">🏆 <b>RUHRANK</b></div>
       <div class="top-acts">
+        <button class="icon-btn" id="themeToggle" title="थीम बदलें">🌙</button>
         <button class="icon-btn" data-go="scr-notifications">🔔<span class="dot hidden" id="notifDot"></span></button>
         <button class="icon-btn" data-go="scr-profile">👤</button>
       </div>
@@ -97,6 +104,10 @@
         <div class="glass card mini" id="homeLiveCard"></div>
       </div>
       <div class="glass card" id="homeRankCard"></div>
+      <div class="row2">
+        <div class="glass card mini" data-go="scr-notes" style="cursor:pointer"><div class="m-ico">📝</div><b>दरोगा नोट्स</b><small style="color:var(--mut)">टॉपिक-wise revision</small></div>
+        <div class="glass card mini" data-go="scr-syllabus" style="cursor:pointer"><div class="m-ico">📋</div><b>सिलेबस ट्रैकर</b><small style="color:var(--mut)">प्रगति देखें</small></div>
+      </div>
       <h3 class="sec-title">📚 लोकप्रिय परीक्षाएँ</h3>
       <div id="homeExams" class="exam-grid"></div>
       <div class="foot-note">Made with ♥ by Hasnain</div>
@@ -284,6 +295,22 @@
     <div class="scroll">
       <input id="searchBox" class="searchbox" placeholder="परीक्षा, प्रश्न, टॉपिक खोजें...">
       <div id="searchRes"></div>
+    </div>
+  </section>
+
+  <!-- ============ NOTES (Daroga) ============ -->
+  <section class="screen" id="scr-notes">
+    <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">📝 <b>दरोगा नोट्स</b></div><div></div></header>
+    <div class="scroll" id="notesBody"></div>
+  </section>
+
+  <!-- ============ SYLLABUS TRACKER ============ -->
+  <section class="screen" id="scr-syllabus">
+    <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">📋 <b>सिलेबस ट्रैकर</b></div><div></div></header>
+    <div class="scroll">
+      <div id="sylExams" class="chip-row" style="margin-bottom:10px"></div>
+      <div class="glass card" id="sylProg"></div>
+      <div id="sylBody"></div>
     </div>
   </section>
 

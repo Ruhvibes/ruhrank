@@ -37,7 +37,8 @@ const SUBJECTS = {
   reasoning:{ name: "Reasoning",         icon: "🧩" },
   english:  { name: "English",           icon: "🔤" },
   bihar:    { name: "Bihar GK",          icon: "🏛️" },
-  ca:       { name: "Current Affairs",   icon: "📰" }
+  ca:       { name: "Current Affairs",   icon: "📰" },
+  daroga:   { name: "बिहार दरोगा",       icon: "🚔" }
 };
 
 // ---------- exam configs (mock engine patterns) ----------
@@ -51,6 +52,11 @@ const EXAMS = {
   "rrb-alp":  { name: "ALP",        cat: "Railway", icon: "🚂", total: 75,  mins: 60,  marks: 1, neg: 0.33, sections: { gk: 20, maths: 20, reasoning: 25, english: 10 } },
   "bihar-police": { name: "Bihar Police", cat: "Bihar", icon: "🚔", total: 100, mins: 120, marks: 1, neg: 0, sections: { gk: 50, bihar: 25, maths: 15, reasoning: 10 } },
   "bihar-si": { name: "Bihar SI",   cat: "Bihar",   icon: "🚔", total: 100, mins: 120, marks: 2, neg: 0.2,  sections: { gk: 40, bihar: 20, maths: 20, reasoning: 20 } },
+  // BPSSC Daroga pattern (verified 2026-10-05 via web: studyiq/infoeazy/testbook/jagranjosh):
+  // Prelims = GK+CA, 100 Q, 200 marks, 2 hrs, neg 0.2, 30% qualifying (screening only);
+  // Mains P1 Hindi (qualifying); Mains P2 = GS+Maths+Reasoning, 100 Q, 200 marks, MERIT deciding.
+  "bpssc-pre":   { name: "Daroga Prelims", cat: "Bihar", icon: "🚔", total: 100, mins: 120, marks: 2, neg: 0.2, sections: { gk: 60, ca: 40 } },
+  "bpssc-mains": { name: "Daroga Mains P2", cat: "Bihar", icon: "🚔", total: 100, mins: 120, marks: 2, neg: 0.2, sections: { daroga: 100 } },
   "bpsc":     { name: "BPSC",       cat: "Bihar",   icon: "🏛️", total: 150, mins: 120, marks: 1, neg: 0,    sections: { gk: 80, bihar: 30, maths: 20, reasoning: 20 } },
   "ibps":     { name: "IBPS",       cat: "Banking", icon: "🏦", total: 100, mins: 60,  marks: 1, neg: 0.25, sections: { gk: 20, maths: 35, reasoning: 35, english: 10 } },
   "sbi":      { name: "SBI PO/Clerk", cat: "Banking", icon: "🏦", total: 100, mins: 60, marks: 1, neg: 0.25, sections: { gk: 20, maths: 35, reasoning: 35, english: 10 } },
@@ -64,12 +70,58 @@ const EXAM_CATS = ["SSC", "Railway", "Bihar", "Banking", "Defence", "Teaching"];
 
 // ---------- question bank (defensive load; other agents fill these) ----------
 var QB = [];
-try {
-  QB = [].concat(
-    window.RR_QB_GK || [], window.RR_QB_MATHS || [], window.RR_QB_REASONING || [],
-    window.RR_QB_ENGLISH || [], window.RR_QB_BIHAR || [], window.RR_QB_CA || []
-  );
-} catch (e) { QB = []; }
+// purane banks ke subject keys normalize ("bihar-gk"→"bihar", "current-affairs"→"ca")
+const SUBJ_FIX = { "bihar-gk": "bihar", "current-affairs": "ca" };
+function fixSubj(q) { if (q && SUBJ_FIX[q.subject]) q.subject = SUBJ_FIX[q.subject]; return q; }
+// ---------- LAZY question banks (performance: 6000 questions!) ----------
+// Tier-1 (core) boot pe load hota hai taaki app fast khule;
+// Tier-2 idle me background me; koi bhi subject kholne pe on-demand load.
+const BANK_DEFS = [
+  { subj:"gk",        file:"questions-gk.js",        global:"RR_QB_GK",        tier:1 },
+  { subj:"maths",     file:"questions-maths.js",     global:"RR_QB_MATHS",     tier:1 },
+  { subj:"reasoning", file:"questions-reasoning.js", global:"RR_QB_REASONING", tier:1 },
+  { subj:"english",   file:"questions-english.js",   global:"RR_QB_ENGLISH",   tier:2 },
+  { subj:"bihar",     file:"questions-bihar.js",     global:"RR_QB_BIHAR",     tier:2 },
+  { subj:"ca",        file:"questions-ca.js",        global:"RR_QB_CA",        tier:2 },
+  { subj:"daroga",    file:"questions-daroga.js",    global:"RR_QB_DAROGA",    tier:2 },
+];
+const bankReady = {};
+loadBank._p = {};
+function loadBank(subj) {
+  if (bankReady[subj]) return Promise.resolve();
+  const def = BANK_DEFS.find(b => b.subj === subj);
+  if (!def) return Promise.resolve();
+  if (loadBank._p[subj]) return loadBank._p[subj];
+  loadBank._p[subj] = new Promise(res => {
+    const s = document.createElement("script");
+    s.src = def.file; s.async = true;
+    s.onload = () => {
+      try {
+        const arr = window[def.global] || [];
+        const ids = new Set(QB.map(q => q.id));
+        arr.forEach(q => { fixSubj(q); if (q && q.id && !ids.has(q.id)) { QB.push(q); ids.add(q.id); } });
+      } catch (e) {}
+      bankReady[subj] = true; res();
+    };
+    s.onerror = () => res(); // fail-open: bank na mile to app chalti rahe
+    document.head.appendChild(s);
+  });
+  return loadBank._p[subj];
+}
+function ensureBanks(list) { return Promise.all((list || BANK_DEFS.map(b => b.subj)).map(loadBank)); }
+// ---------- LAZY notes bank ----------
+let NOTES = [];
+let notesReady = false;
+function loadNotes() {
+  if (notesReady) return Promise.resolve();
+  return new Promise(res => {
+    const s = document.createElement("script");
+    s.src = "notes-daroga.js"; s.async = true;
+    s.onload = () => { try { NOTES = window.RR_NOTES_DAROGA || []; } catch (e) {} notesReady = true; res(); };
+    s.onerror = () => res();
+    document.head.appendChild(s);
+  });
+}
 
 // built-in sample bank (fallback so app works standalone)
 const RR_SAMPLE = [
@@ -382,7 +434,11 @@ function fetchRemoteQB() {
       .then(j => {
         if (j && Array.isArray(j.questions) && j.questions.length) {
           const ids = new Set(QB.map(q => q.id));
-          j.questions.forEach(q => { if (q.id && !ids.has(q.id)) { QB.push(q); ids.add(q.id); } });
+          const okQ = q => q && typeof q.id === "string" && q.id && !ids.has(q.id)
+            && typeof q.q === "string" && q.q
+            && Array.isArray(q.opts) && q.opts.length === 4
+            && Number.isInteger(q.ans) && q.ans >= 0 && q.ans <= 3;
+          j.questions.forEach(q => { if (okQ(q)) { fixSubj(q); QB.push(q); ids.add(q.id); } });
           console.log("RuhRank: remote questions merged:", j.questions.length);
         }
       }).catch(() => {});
@@ -416,7 +472,8 @@ function showScreen(id, push) {
     "scr-competition": renderComp, "scr-performance": renderPerf, "scr-ca": renderCA,
     "scr-bookmarks": renderBookmarks, "scr-achievements": renderAch, "scr-profile": renderProfile,
     "scr-notifications": renderNotifs, "scr-practice-setup": renderPracticeSetup, "scr-mock-setup": renderMockSetup,
-    "scr-search": renderSearch, "scr-pyq": renderPYQScreen
+    "scr-search": renderSearch, "scr-pyq": renderPYQScreen, "scr-notes": renderNotes,
+    "scr-syllabus": renderSyllabus
   };
   if (R[id]) try { R[id](); } catch (e) { console.log(e); }
   el.querySelector(".scroll") && (el.querySelector(".scroll").scrollTop = 0);
@@ -465,12 +522,162 @@ function checkUpdate(manual) {
     let vc = 0;
     try { vc = (typeof Android !== "undefined" && Android.getVersionCode) ? Android.getVersionCode() : 0; } catch (e) {}
     if (j && j.versionCode > vc) {
-      $("updateNotes").textContent = (j.notes_hi || "नया अपडेट आ गया है!") + " (v" + j.versionName + ")";
-      $("updateDialog").classList.remove("hidden");
-      $("btnDoUpdate").onclick = () => { try { Android.downloadApk(j.apk); } catch (e) { window.open(j.apk, "_blank"); } $("updateDialog").classList.add("hidden"); };
+      // Gentle reminder schedule: release ke 2 din tak ROZ ek baar,
+      // uske baad hafte me ek baar (pareshan nahi karna). Koi blocking nahi.
+      const releasedAt = Number(j.releasedAt) || 0;
+      const daysSince = releasedAt ? (Date.now() - releasedAt) / 86400000 : 99;
+      let show = manual;
+      if (!manual) {
+        if (daysSince < 2) show = store.get("upd_rem_d", "") !== todayKey();
+        else show = (Date.now() - (Number(store.get("upd_rem_w", 0)) || 0)) >= 7 * 86400000;
+      }
+      if (show) {
+        if (daysSince < 2) store.set("upd_rem_d", todayKey());
+        else store.set("upd_rem_w", Date.now());
+        $("updateNotes").textContent = (j.notes_hi || "नया अपडेट आ गया है!") + " (v" + j.versionName + ")";
+        $("updateDialog").classList.remove("hidden");
+        $("btnDoUpdate").onclick = () => { try { Android.downloadApk(j.apk); } catch (e) { window.open(j.apk, "_blank"); } $("updateDialog").classList.add("hidden"); };
+      }
     } else if (manual) toast("सब कुछ नवीनतम है ✅");
     store.set("upd_check", todayKey());
   }).catch(() => { if (manual) toast("जाँच नहीं हो पाई"); });
+}
+
+// ============================================================
+// SYLLABUS TRACKER
+// ============================================================
+const SYLLABUS = {
+  "bpssc-mains": { name: "Bihar Daroga — Mains P2", icon: "🚔", sections: [
+    { name: "इतिहास", topics: ["प्राचीन भारत", "मध्यकालीन भारत", "आधुनिक भारत", "बिहार का इतिहास", "स्वतंत्रता आंदोलन"] },
+    { name: "भूगोल", topics: ["भारत का भूगोल", "बिहार का भूगोल", "नदियाँ एवं पर्वत", "जलवायु एवं मिट्टी"] },
+    { name: "राजव्यवस्था", topics: ["संविधान — मौलिक अधिकार", "संसद एवं राष्ट्रपति", "न्यायपालिका", "पंचायती राज"] },
+    { name: "विज्ञान", topics: ["भौतिकी", "रसायन विज्ञान", "जीव विज्ञान", "पर्यावरण"] },
+    { name: "गणित", topics: ["प्रतिशत / अनुपात", "लाभ-हानि / ब्याज", "समय-कार्य / चाल", "बीजगणित", "क्षेत्रमिति"] },
+    { name: "रीजनिंग", topics: ["श्रृंखला", "कोडिंग-डिकोडिंग", "रक्त संबंध", "दिशा ज्ञान", "न्याय निगमन"] },
+    { name: "करेंट अफेयर्स", topics: ["राष्ट्रीय", "अंतरराष्ट्रीय", "बिहार करेंट", "खेल / पुरस्कार"] },
+    { name: "हिंदी (Paper 1)", topics: ["संधि / समास", "पर्यायवाची / विलोम", "मुहावरे / लोकोक्तियाँ", "वाक्य शुद्धि"] }
+  ]},
+  "ssc-cgl": { name: "SSC CGL — Tier 1", icon: "🏛️", sections: [
+    { name: "GK", topics: ["इतिहास", "राजव्यवस्था", "भूगोल", "अर्थशास्त्र", "विज्ञान", "करेंट अफेयर्स"] },
+    { name: "Maths", topics: ["अंकगणित", "बीजगणित", "ज्यामिति", "त्रिकोणमिति", "क्षेत्रमिति", "DI"] },
+    { name: "Reasoning", topics: ["श्रृंखला", "कोडिंग", "रक्त संबंध", "दिशा", "न्याय निगमन", "सादृश्यता"] },
+    { name: "English", topics: ["Error Detection", "Vocabulary", "Idioms", "Comprehension"] }
+  ]},
+  "rrb-ntpc": { name: "Railway NTPC — CBT 1", icon: "🚂", sections: [
+    { name: "Maths", topics: ["अंकगणित", "बीजगणित", "ज्यामिति", "क्षेत्रमिति", "DI"] },
+    { name: "Reasoning", topics: ["श्रृंखला", "कोडिंग", "रक्त संबंध", "दिशा", "पहेली"] },
+    { name: "GK / GA", topics: ["इतिहास", "भूगोल", "राजव्यवस्था", "विज्ञान", "करेंट अफेयर्स", "रेलवे GK"] }
+  ]},
+  "bpsc": { name: "BPSC — Prelims", icon: "🏛️", sections: [
+    { name: "इतिहास", topics: ["प्राचीन", "मध्यकालीन", "आधुनिक", "बिहार इतिहास"] },
+    { name: "भूगोल", topics: ["भारत", "बिहार", "विश्व"] },
+    { name: "राजव्यवस्था / अर्थव्यवस्था", topics: ["संविधान", "अर्थशास्त्र"] },
+    { name: "विज्ञान / करेंट", topics: ["सामान्य विज्ञान", "करेंट अफेयर्स", "बिहार विशेष"] }
+  ]}
+};
+let SYL_EXAM = "bpssc-mains";
+function sylDone(exam) { return store.get("syl_" + exam, {}); }
+function renderSyllabus() {
+  const ids = Object.keys(SYLLABUS);
+  if (!SYLLABUS[SYL_EXAM]) SYL_EXAM = ids[0];
+  $("sylExams").innerHTML = ids.map(id =>
+    `<button class="chip ${SYL_EXAM === id ? "on" : ""}" data-e="${id}">${SYLLABUS[id].icon} ${esc(SYLLABUS[id].name)}</button>`).join("");
+  $$("#sylExams .chip").forEach(c => c.onclick = () => { SYL_EXAM = c.dataset.e; renderSyllabus(); });
+  const syl = SYLLABUS[SYL_EXAM];
+  const done = sylDone(SYL_EXAM);
+  let total = 0, ndone = 0;
+  $("sylBody").innerHTML = syl.sections.map((sec, si) => {
+    const rows = sec.topics.map((t, ti) => {
+      const k = si + ":" + ti; total++;
+      const on = !!done[k]; if (on) ndone++;
+      return `<label class="syl-row ${on ? "done" : ""}"><input type="checkbox" data-k="${k}" ${on ? "checked" : ""}><span>${esc(t)}</span></label>`;
+    }).join("");
+    return `<div class="glass card"><b>${esc(sec.name)}</b>${rows}</div>`;
+  }).join("");
+  const pct = total ? Math.round(ndone / total * 100) : 0;
+  $("sylProg").innerHTML = `<div class="bar-row"><div class="bl"><span>📋 ${esc(syl.name)}</span><span>${pct}%</span></div>
+    <div class="bar"><div class="fill" style="width:${pct}%"></div></div></div>
+    <small style="color:var(--mut)">${ndone}/${total} टॉपिक पूर्ण</small>`;
+  $$("#sylBody input[type=checkbox]").forEach(cb => cb.onchange = () => {
+    const d = sylDone(SYL_EXAM); d[cb.dataset.k] = cb.checked; store.set("syl_" + SYL_EXAM, d);
+    renderSyllabus();
+  });
+}
+
+// ============================================================
+// NOTES SCREEN (Bihar Daroga notes)
+// ============================================================
+function noteBm() { return store.get("note_bm", []); }
+function renderNotes() {
+  loadNotes().then(() => {
+    if (!NOTES.length) { $("notesBody").innerHTML = `<p style="color:var(--mut)">📝 नोट्स लोड हो रहे हैं…</p>`; return; }
+    const bm = noteBm();
+    $("notesBody").innerHTML = NOTES.map(nt => {
+      const cnt = nt.style === "qa" ? (nt.qa || []).length : (nt.points || []).length;
+      const isBm = bm.indexOf(nt.id) >= 0;
+      return `<div class="glass card note-card" data-nt="${nt.id}" style="cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><span style="font-size:22px">${nt.icon || "📝"}</span> <b>${esc(nt.title)}</b><br>
+          <small style="color:var(--mut)">${cnt} points${nt.style === "qa" ? " • प्रश्नोत्तर" : ""}</small></div>
+          <button class="icon-btn" data-bm="${nt.id}">${isBm ? "⭐" : "☆"}</button>
+        </div></div>`;
+    }).join("");
+    $$("#notesBody .note-card").forEach(c => c.onclick = e => {
+      if (e.target.closest("[data-bm]")) return;
+      openNote(c.dataset.nt);
+    });
+    $$("#notesBody [data-bm]").forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      const id = b.dataset.bm; let arr = noteBm();
+      arr = arr.indexOf(id) >= 0 ? arr.filter(x => x !== id) : arr.concat([id]);
+      store.set("note_bm", arr); renderNotes();
+    });
+  });
+}
+function openNote(id) {
+  const nt = NOTES.find(n => n.id === id); if (!nt) return;
+  const bm = noteBm(); const isBm = bm.indexOf(id) >= 0;
+  let body = "";
+  if (nt.style === "qa") {
+    body = (nt.qa || []).map((p, i) =>
+      `<div class="glass card"><b style="color:var(--gold)">Q${i + 1}. ${esc(p[0])}</b><div style="margin-top:6px">✅ ${esc(p[1])}</div></div>`).join("");
+  } else {
+    body = (nt.points || []).map((p, i) =>
+      `<div class="note-point"><span class="np-n">${i + 1}</span><span>${esc(p)}</span></div>`).join("");
+  }
+  $("notesBody").innerHTML = `
+    <button class="btn sm ghost" id="noteBack" style="width:auto;margin-bottom:10px">← सभी नोट्स</button>
+    <div class="glass card"><div style="display:flex;justify-content:space-between;align-items:center">
+      <div><span style="font-size:24px">${nt.icon || "📝"}</span> <b>${esc(nt.title)}</b></div>
+      <button class="icon-btn" id="noteBmBtn">${isBm ? "⭐" : "☆"}</button></div>
+      <button class="btn gold" id="notePractice" style="margin-top:10px">▶️ इस टॉपिक से प्रैक्टिस करें</button>
+    </div>${body}`;
+  $("noteBack").onclick = renderNotes;
+  $("noteBmBtn").onclick = () => {
+    let arr = noteBm();
+    arr = arr.indexOf(id) >= 0 ? arr.filter(x => x !== id) : arr.concat([id]);
+    store.set("note_bm", arr); openNote(id);
+  };
+  $("notePractice").onclick = () => practiceNoteTopic(nt);
+  $("notesBody").scrollTop = 0;
+}
+function openNoteFromSearch(id) {
+  showScreen("scr-notes");
+  loadNotes().then(() => openNote(id));
+}
+function practiceNoteTopic(nt) {
+  ensureBanks().then(() => {
+    let qs = [];
+    if (nt.qids && nt.qids.length) qs = QB.filter(q => nt.qids.indexOf(q.id) >= 0);
+    if (qs.length < 5 && nt.practice) {
+      const pf = nt.practice;
+      qs = QB.filter(q => q.subject === pf.subject &&
+        (!pf.topics || pf.topics === "all" || pf.topics.indexOf(q.topic) >= 0));
+    }
+    qs = qs.slice(0, 50);
+    if (!qs.length) { toast("इस टॉपिक के प्रश्न जल्द आ रहे हैं"); return; }
+    startPractice({ mode: "practice", title: "📝 " + nt.title, qids: qs.map(q => q.id) });
+  });
 }
 
 // ============================================================
@@ -577,7 +784,11 @@ let PS = { subject: "gk", topic: "all", count: 10, mode: "practice" };
 function renderPracticeSetup() {
   $("psSubjects").innerHTML = Object.keys(SUBJECTS).map(s =>
     `<button class="chip ${PS.subject === s ? "on" : ""}" data-s="${s}">${SUBJECTS[s].icon} ${SUBJECTS[s].name}</button>`).join("");
-  $$("#psSubjects .chip").forEach(c => c.onclick = () => { PS.subject = c.dataset.s; PS.topic = "all"; renderPracticeSetup(); });
+  $$("#psSubjects .chip").forEach(c => c.onclick = () => {
+    const s = c.dataset.s;
+    if (!bankReady[s]) { toast("📥 बैंक लोड हो रहा है…"); loadBank(s).then(() => renderPracticeSetup()); return; }
+    PS.subject = s; PS.topic = "all"; renderPracticeSetup();
+  });
   const topics = ["all"].concat(Array.from(new Set(QB.filter(q => q.subject === PS.subject).map(q => q.topic))));
   $("psTopics").innerHTML = topics.map(t =>
     `<button class="chip ${PS.topic === t ? "on" : ""}" data-t="${esc(t)}">${t === "all" ? "सभी टॉपिक" : esc(t)}</button>`).join("");
@@ -587,6 +798,7 @@ function renderPracticeSetup() {
 }
 function pickQuestions(opts) {
   let pool = QB.slice();
+  if (opts.qids && opts.qids.length) pool = pool.filter(q => opts.qids.indexOf(q.id) >= 0);
   if (opts.subject && opts.subject !== "all") pool = pool.filter(q => q.subject === opts.subject);
   if (opts.topic && opts.topic !== "all") pool = pool.filter(q => q.topic === opts.topic);
   if (opts.exam) pool = pool.filter(q => !q.exam || q.exam.indexOf(opts.exam) >= 0);
@@ -606,6 +818,14 @@ function pickQuestions(opts) {
 // ---- practice session ----
 let PR = null;
 function startPractice(opts) {
+  // lazy banks: zaroori subject(s) pehle load karo
+  let need;
+  if (opts.qids && opts.qids.length) need = [];
+  else if (opts.subject && opts.subject !== "all") need = [opts.subject];
+  else need = BANK_DEFS.map(b => b.subj);
+  ensureBanks(need).then(() => startPracticeNow(opts));
+}
+function startPracticeNow(opts) {
   const qs = pickQuestions(opts);
   if (!qs.length) { toast("इस फ़िल्टर में प्रश्न नहीं मिले"); return; }
   PR = { qs, i: 0, ans: new Array(qs.length).fill(-1), ok: new Array(qs.length).fill(null), t0: Date.now(), mode: opts.mode || "practice", title: opts.title || "Practice", timed: (opts.mode === "timed") ? 60 * qs.length : 0, timerId: null };
@@ -624,7 +844,7 @@ function renderPR() {
   $("prBar").style.width = ((PR.i + 1) / PR.qs.length * 100) + "%";
   $("prCount").textContent = "Q " + (PR.i + 1) + "/" + PR.qs.length;
   $("prTopic").textContent = (SUBJECTS[q.subject] ? SUBJECTS[q.subject].icon + " " + SUBJECTS[q.subject].name : q.subject) + " • " + q.topic;
-  $("prQ").textContent = q.q;
+  $("prQ").innerHTML = esc(q.q) + (q.d ? '<div class="diagram-box">' + renderDiagram(q.d) + '</div>' : '');
   $("prBookmark").textContent = isBookmarked(q.id) ? "🔖" : "📑";
   $("prBookmark").onclick = () => { toggleBookmark(q.id); renderPR(); };
   const box = $("prOpts"); box.innerHTML = "";
@@ -731,6 +951,12 @@ function buildMockQuestions() {
 }
 let MK = null;
 function startMock() {
+  // lazy banks: mock ke sections wale subjects pehle load karo
+  const ex = EXAMS[U.profile.exam || "ssc-cgl"];
+  const need = (MS.type === "full" && ex) ? Object.keys(ex.sections) : BANK_DEFS.map(b => b.subj);
+  ensureBanks(need).then(() => startMockNow());
+}
+function startMockNow() {
   const b = buildMockQuestions();
   if (!b.qs.length) { toast("प्रश्न नहीं मिले"); return; }
   MK = {
@@ -765,7 +991,7 @@ function renderMK() {
   MK.seen[MK.i] = true;
   $("mkCount").textContent = "Q " + (MK.i + 1) + "/" + MK.qs.length;
   $("mkSec").textContent = q.subject && SUBJECTS[q.subject] ? SUBJECTS[q.subject].icon + " " + SUBJECTS[q.subject].name : "";
-  $("mkQ").textContent = q.q;
+  $("mkQ").innerHTML = esc(q.q) + (q.d ? '<div class="diagram-box">' + renderDiagram(q.d) + '</div>' : '');
   const box = $("mkOpts"); box.innerHTML = "";
   q.opts.forEach((o, i) => {
     const b = document.createElement("button");
@@ -875,6 +1101,7 @@ function renderResult(r, qs) {
       const div = document.createElement("div");
       div.className = "glass card rev-q";
       div.innerHTML = `<div class="rq"><b>Q${i + 1}.</b> ${esc(q.q)} ${d.ok === true ? "✅" : d.ok === false ? "❌" : "⏭️"}</div>
+        ${q.d ? '<div class="diagram-box">' + renderDiagram(q.d) + '</div>' : ''}
         <div style="font-size:13px;color:var(--mut)">सही: <b style="color:var(--green)">${esc(q.opts[q.ans])}</b></div>
         <div style="font-size:13px;margin-top:4px">${esc(q.exp || "")}</div>
         <button class="btn sm ghost" style="margin-top:8px">🤖 Explain</button>`;
@@ -1015,7 +1242,8 @@ function renderHomeExtras() {
 }
 // Share score card
 function shareScore(r) {
-  const txt = `🏆 RuhRank: मैंने "${r.title}" में ${r.finalScore}/${r.maxScore} स्कोर किया! (${r.pct}% स्कोर • ${r.acc}% एक्यूरेसी)\nPractice • Compete • Rank`;
+  const dl = "https://github.com/Ruhvibes/ruhrank/releases/download/v1/RuhRank.apk";
+  const txt = `🏆 RuhRank: मैंने "${r.title}" में ${r.finalScore}/${r.maxScore} स्कोर किया! (${r.pct}% स्कोर • ${r.acc}% एक्यूरेसी)\nPractice • Compete • Rank\n⬇️ ऐप डाउनलोड करें: ${dl}`;
   if (navigator.share) { navigator.share({ title: "RuhRank स्कोर", text: txt }).catch(() => {}); }
   else if (navigator.clipboard) { navigator.clipboard.writeText(txt).then(() => toast("✅ स्कोर कॉपी हो गया!")).catch(() => toast("❌ कॉपी नहीं हो सका")); }
   else toast("❌ शेयर उपलब्ध नहीं है");
@@ -1229,6 +1457,9 @@ window.viewLiveResults = function (id) {
   renderLiveFinalBox(id, c.title || "लाइव बैटल", "vrBox");
 };
 window.startCompBattle = function (id) {
+  ensureBanks().then(() => startCompBattleNow(id));
+};
+function startCompBattleNow(id) {
   const t = COMP_TYPES.find(x => x.id === id) || COMP_TYPES[0];
   // time-windowed mock vs bots
   const qs = shuffle(QB).slice(0, t.count);
@@ -1329,6 +1560,7 @@ window.caQuiz = function (i) {
 let PYQ = { exam: "bihar-police", year: "2024", sub: "gk" };
 const PYQ_YEARS = ["2025", "2024", "2023", "2022", "2021", "2020"];
 function renderPYQScreen() {
+  if (!BANK_DEFS.every(b => bankReady[b.subj])) { ensureBanks().then(() => renderPYQScreen()); return; }
   $("pyqExams").innerHTML = Object.keys(EXAMS).map(id => `<button class="chip ${PYQ.exam === id ? "on" : ""}" data-e="${id}">${EXAMS[id].icon} ${esc(EXAMS[id].name)}</button>`).join("");
   $$("#pyqExams .chip").forEach(c => c.onclick = () => { PYQ.exam = c.dataset.e; renderPYQScreen(); });
   $("pyqYears").innerHTML = PYQ_YEARS.map(y => `<button class="chip ${PYQ.year === y ? "on" : ""}" data-y="${y}">${y}</button>`).join("");
@@ -1443,6 +1675,9 @@ function renderProfile() {
 // SEARCH
 // ============================================================
 function renderSearch() {
+  // saare banks background me ensure karo taaki search poora ho
+  ensureBanks().then(() => { const b = $("searchBox"); if (b && b.value.trim()) b.oninput && b.oninput(); });
+  loadNotes();
   const box = $("searchBox");
   const doSearch = () => {
     const s = box.value.trim().toLowerCase();
@@ -1457,6 +1692,12 @@ function renderSearch() {
        <button class="btn sm ghost" onclick="toggleBookmark('${q.id}')">🔖 सेव करें</button></div></div>`).join("");
     const tHit = Array.from(new Set(QB.map(q => q.topic))).filter(t => t.toLowerCase().includes(s)).slice(0, 10);
     if (tHit.length) html += `<h3 class="sec-title">Topics</h3><div class="chip-row">` + tHit.map(t => `<button class="chip" onclick="startPractice({topic:'${esc(t)}',subject:'all',count:10,mode:'practice',title:'${esc(t)}'})">${esc(t)}</button>`).join("") + `</div>`;
+    const nHit = NOTES.filter(nt => nt.title.toLowerCase().includes(s) ||
+      (nt.points || []).some(p => p.toLowerCase().includes(s)) ||
+      (nt.qa || []).some(x => x[0].toLowerCase().includes(s) || x[1].toLowerCase().includes(s))).slice(0, 8);
+    if (nHit.length) html += `<h3 class="sec-title">Notes (${nHit.length})</h3>` + nHit.map(nt =>
+      `<div class="glass card rev-q"><div class="rq">${nt.icon || "📝"} <b>${esc(nt.title)}</b></div>
+       <div class="qacts"><button class="btn sm gold" onclick="openNoteFromSearch('${nt.id}')">📖 खोलें</button></div></div>`).join("");
     $("searchRes").innerHTML = html || "<p style='color:var(--mut)'>कुछ नहीं मिला।</p>";
   };
   box.oninput = doSearch;
@@ -1482,8 +1723,18 @@ function renderNotifs() {
 // ============================================================
 // WIRING + BOOT
 // ============================================================
+function applyTheme() {
+  const dark = U.profile.dark !== false;
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  const t = $("themeToggle"); if (t) t.textContent = dark ? "🌙" : "☀️";
+}
+function toggleTheme() {
+  const p = U.profile; p.dark = !(p.dark !== false); U.profile = p;
+  applyTheme(); toast(p.dark ? "🌙 डार्क मोड" : "☀️ लाइट मोड");
+}
 function wire() {
   $("btnRetryNet").onclick = checkNet;
+  const tt = $("themeToggle"); if (tt) tt.onclick = toggleTheme;
   $("btnOfflineGo").onclick = () => $("offlineOverlay").classList.add("hidden");
   $("btnLaterUpdate").onclick = () => $("updateDialog").classList.add("hidden");
   $("aiClose").onclick = () => $("aiModal").classList.add("hidden");
@@ -1516,16 +1767,50 @@ function wire() {
     notify("🔥 दैनिक चुनौती लाइव है!", "रोज़ 10 प्रश्न, 5 मिनट — स्ट्रीक बनाएँ!");
   }
 }
+// ============================================================
+// REMOTE KILL SWITCH (Hasnain door se app band/chalu kar sakte hain)
+// ============================================================
+// NOTE (honest limitation): offline hone par ye check chal hi nahi pata —
+// kill switch sirf tab lagu hota hai jab version.json successfully fetch ho.
+// Isliye har launch pe FRESH check hota hai (daily cache nahi).
+let __booted = false;
+function checkKillSwitch(cb) {
+  if (!navigator.onLine) { cb(false); return; }
+  fetch(VJSON + "?t=" + Date.now(), { cache: "no-store" }).then(r => r.json()).then(j => {
+    if (j && j.appDisabled === true) {
+      $("killTitle").textContent = j.disabledTitle_hi || "सेवा अस्थायी रूप से बंद है";
+      $("killMsg").textContent = j.disabledMessage_hi || "रखरखाव कार्य चल रहा है। कृपया कुछ समय बाद पुनः प्रयास करें।";
+      $("killSwitchOverlay").classList.remove("hidden");
+      cb(true);
+    } else {
+      $("killSwitchOverlay").classList.add("hidden");
+      cb(false);
+    }
+  }).catch(() => cb(false)); // fetch fail = app chalti rahe
+}
 function boot() {
+  // retry button hamesha wired rahe (kill overlay kabhi bhi aa sakta hai)
+  try { $("btnKillRetry").onclick = () => checkKillSwitch(d => { if (!d && !__booted) bootMain(); }); } catch (e) {}
+  checkKillSwitch(disabled => { if (!disabled) bootMain(); });
+}
+function bootMain() {
+  if (__booted) return;
+  __booted = true;
   wire();
   fbInit();
   fetchRemoteQB();
   checkNet();
-  renderOnboard();
-  if (store.get("onboard", false) && U.profile.exam) { navStack = []; showScreen("scr-home"); }
-  else { navStack = []; showScreen("scr-onboard", true); }
-  // daily update check
-  if (store.get("upd_check", "") !== todayKey()) setTimeout(() => checkUpdate(false), 5000);
-  renderNotifDot();
+  // Tier-1 banks pehle (fast boot), UI uske baad; Tier-2 idle me background me
+  Promise.all([loadBank("gk"), loadBank("maths"), loadBank("reasoning")]).then(() => {
+    if (!QB.length) { try { QB = RR_SAMPLE.slice(); } catch (e) {} }
+    renderOnboard();
+    if (store.get("onboard", false) && U.profile.exam) { navStack = []; showScreen("scr-home"); }
+    else { navStack = []; showScreen("scr-onboard", true); }
+    // update check: har boot pe (gentle reminder — 2 din daily, phir weekly; koi blocking nahi)
+    setTimeout(() => checkUpdate(false), 5000);
+    renderNotifDot();
+    const idle = window.requestIdleCallback || (fn => setTimeout(fn, 4000));
+    idle(() => { ensureBanks(); loadNotes(); });
+  });
 }
 document.addEventListener("DOMContentLoaded", boot);

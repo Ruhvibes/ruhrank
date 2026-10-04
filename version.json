@@ -1,6 +1,10 @@
 {
-  "versionCode": 3,
+  "versionCode": 4,
   "versionName": "1.0",
   "apkUrl": "https://github.com/Ruhvibes/ruhrank/releases/download/v1/RuhRank.apk",
-  "changelog": "RuhRank 1.0 \u2014 Practice \u2022 Compete \u2022 Rank. 710 questions, mock tests, leaderboard, AI explain. Premium UI + new icon."
+  "notes_hi": "RuhRank 1.0 — 6000 प्रश्न! बिहार दरोगा PYQ बैंक (500), दरोगा नोट्स (19 टॉपिक), डायग्राम, सिलेबस ट्रैकर, डार्क मोड, लेज़ी-लोड।",
+  "releasedAt": 1791144003000,
+  "appDisabled": false,
+  "disabledTitle_hi": "सेवा अस्थायी रूप से बंद है",
+  "disabledMessage_hi": "रखरखाव कार्य चल रहा है। कृपया कुछ समय बाद पुनः प्रयास करें।"
 }
