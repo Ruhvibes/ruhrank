@@ -1,7 +1,6 @@
 {
-  "versionCode": 0,
+  "versionCode": 1,
   "versionName": "1.0",
-  "apk": "https://github.com/Ruhvibes/ruhrank/releases/download/v1/RuhRank.apk",
-  "notes_hi": "RuhRank 1.0",
-  "notes_en": "RuhRank 1.0"
+  "apkUrl": "https://github.com/Ruhvibes/ruhrank/releases/download/v1/RuhRank.apk",
+  "changelog": "RuhRank 1.0 — Practice • Compete • Rank. 710 questions, mock tests, leaderboard, AI explain."
 }
