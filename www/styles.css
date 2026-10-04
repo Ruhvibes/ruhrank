@@ -356,3 +356,19 @@ body{
   padding:10px 16px;text-align:center;min-width:72px}
 .ob-stat b{display:block;font-size:19px;color:var(--gold)}
 .ob-stat small{color:var(--mut);font-size:11px}
+
+/* ===== live battle ===== */
+.liveboard{background:linear-gradient(135deg,#1c1548,#0b1030);border:1px solid rgba(245,179,1,.5);
+  border-radius:14px;padding:12px;margin:10px;box-shadow:0 0 20px rgba(245,179,1,.22)}
+.liveboard .lb-row{display:flex;align-items:center;gap:8px;padding:7px 6px;border-bottom:1px solid rgba(255,255,255,.07);font-size:14px}
+.liveboard .lb-row:last-child{border-bottom:none}
+.liveboard .lb-row span:first-child{width:34px;color:var(--mut)}
+.liveboard .lb-row span:nth-child(2){flex:1;display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.liveboard .lb-row b{color:var(--gold2)}
+.liveboard .lb-row.me{background:rgba(245,179,1,.13);border-radius:10px;font-weight:700}
+.lb-av{width:22px;height:22px;border-radius:50%;object-fit:cover}
+.live-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 8px var(--red);animation:blink 1.1s infinite}
+@keyframes blink{50%{opacity:.35}}
+.cd{font-variant-numeric:tabular-nums;color:var(--gold2);font-weight:700}
+.login-av{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)}

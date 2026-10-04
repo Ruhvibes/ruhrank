@@ -16,6 +16,16 @@ const store = {
 };
 const esc = s => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+// Deterministic shuffle — same seed => same order for every participant (live battle)
+function seededShuffle(arr, seedStr) {
+  let h = 2166136261; const s = String(seedStr);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let a = h >>> 0;
+  const rnd = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const o = arr.slice();
+  for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = o[i]; o[i] = o[j]; o[j] = t; }
+  return o;
+}
 const todayKey = () => new Date().toISOString().slice(0, 10);
 function hashStr(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return Math.abs(h); }
 function seededPick(arr, seed, n) { const out = []; const used = new Set(); let h = hashStr(seed); for (let k = 0; k < n && out.length < arr.length; k++) { h = (h * 1103515245 + 12345) & 0x7fffffff; const i = h % arr.length; if (!used.has(i)) { used.add(i); out.push(arr[i]); } } return out; }
@@ -173,9 +183,157 @@ function fbInit() {
     if (!cfg || !window.firebase) { console.log("RuhRank: local mode (no Firebase config)"); return; }
     firebase.initializeApp(cfg);
     FB.db = firebase.firestore();
-    firebase.auth().signInAnonymously().then(c => { FB.uid = c.user.uid; FB.on = true; fbPullAll(); })
-      .catch(e => console.log("FB auth fail, local mode", e));
+    const auth = firebase.auth();
+    // Auth state listener — login/logout pe profile sync
+    auth.onAuthStateChanged(u => { if (u && FB.on) syncProfileFromAuth(u); });
+    // 1. Pehle redirect result (Google login se wapas aaye hon to)
+    auth.getRedirectResult().then(handleRedirectResult).catch(e => {
+      console.log("redirect result:", e && e.code);
+      if (e && e.code === "auth/credential-already-in-use") toast("❌ यह Google account पहले से किसी अन्य ID से जुड़ा है");
+    }).finally(() => {
+      // 2. Phir anonymous sign-in (agar koi user nahi hai)
+      const cur = auth.currentUser;
+      if (cur) { FB.uid = cur.uid; FB.on = true; syncProfileFromAuth(cur); fbPullAll(); }
+      else auth.signInAnonymously().then(c => { FB.uid = c.user.uid; FB.on = true; fbPullAll(); })
+        .catch(e => console.log("FB auth fail, local mode", e));
+    });
   } catch (e) { console.log("FB init fail, local mode", e); }
+}
+// Google redirect se wapas aane pe — anonymous account link ho chuka hota hai (same UID)
+function handleRedirectResult(res) {
+  if (!res || !res.user) return;
+  FB.uid = res.user.uid; FB.on = true;
+  syncProfileFromAuth(res.user);
+  fbPushScore();
+  toast("✅ Google से लॉगिन हो गया!");
+  try { if (navStack[navStack.length - 1] === "scr-profile") renderProfile(); } catch (e) {}
+}
+function syncProfileFromAuth(u) {
+  try {
+    const p = U.profile; let ch = false;
+    if (u.displayName && !p.name) { p.name = u.displayName; ch = true; }
+    if (u.photoURL && !p.photo) { p.photo = u.photoURL; ch = true; }
+    if (u.email && !p.email) { p.email = u.email; ch = true; }
+    const prov = u.isAnonymous ? "anonymous" : ((u.providerData && u.providerData[0] && u.providerData[0].providerId) || "linked");
+    if (p.provider !== prov) { p.provider = prov; ch = true; }
+    if (ch) U.profile = p;
+  } catch (e) {}
+}
+
+// ============================================================
+// LOGIN — Google (redirect) + Email/Password
+// ============================================================
+function authErrorMsg(e) {
+  const c = (e && e.code) || "";
+  const M = {
+    "auth/invalid-email": "❌ ईमेल पता सही नहीं है",
+    "auth/user-not-found": "❌ इस ईमेल से कोई account नहीं है — नया account बनाएँ",
+    "auth/wrong-password": "❌ पासवर्ड गलत है",
+    "auth/email-already-in-use": "❌ यह ईमेल पहले से registered है — लॉगिन करें",
+    "auth/weak-password": "❌ पासवर्ड कम से कम 6 अक्षर का रखें",
+    "auth/network-request-failed": "❌ इंटरनेट उपलब्ध नहीं है",
+    "auth/credential-already-in-use": "❌ यह account पहले से किसी अन्य ID से जुड़ा है",
+    "auth/too-many-requests": "❌ बहुत प्रयास हुए — कुछ देर बाद पुनः प्रयास करें",
+    "auth/operation-not-allowed": "❌ यह login विधि अभी चालू नहीं है",
+    "auth/user-disabled": "❌ यह account बंद कर दिया गया है"
+  };
+  return M[c] || "❌ लॉगिन में समस्या हुई — पुनः प्रयास करें";
+}
+function afterLoginUser(u, how) {
+  FB.uid = u.uid; FB.on = true;
+  const p = U.profile;
+  if (u.displayName) p.name = u.displayName;
+  if (u.photoURL) p.photo = u.photoURL;
+  if (u.email) p.email = u.email;
+  p.provider = how; U.profile = p;
+  fbPushScore();
+  toast("✅ लॉगिन सफल!");
+  try { renderProfile(); } catch (e) {}
+}
+// Google login — anonymous account se LINK (UID, XP, streak sab bana rahta hai)
+window.doGoogleLogin = function () {
+  if (!FB.on || !window.firebase) { toast("🌐 लॉगिन के लिए इंटरनेट आवश्यक है"); return; }
+  try {
+    const auth = firebase.auth();
+    const user = auth.currentUser;
+    const provider = new firebase.auth.GoogleAuthProvider();
+    if (user && user.isAnonymous) {
+      user.linkWithRedirect(provider); // purana data bana rahega
+    } else if (user) {
+      toast("✅ आप पहले से लॉगिन हैं");
+    } else {
+      auth.signInWithRedirect(provider);
+    }
+  } catch (e) { toast("❌ लॉगिन शुरू नहीं हो सका"); }
+};
+// Email/Password — mode: "login" ya "signup"
+window.doEmailAuth = function (mode) {
+  if (!FB.on || !window.firebase) { toast("🌐 लॉगिन के लिए इंटरनेट आवश्यक है"); return; }
+  const em = ($("loginEmail") || {}).value || "";
+  const pw = ($("loginPass") || {}).value || "";
+  const email = em.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast("❌ सही ईमेल पता लिखें"); return; }
+  if (pw.length < 6) { toast("❌ पासवर्ड कम से कम 6 अक्षर का रखें"); return; }
+  const auth = firebase.auth();
+  const user = auth.currentUser;
+  toast("⏳ कृपया प्रतीक्षा करें…");
+  if (mode === "signup") {
+    const cred = firebase.auth.EmailAuthProvider.credential(email, pw);
+    const done = u => afterLoginUser(u, "password");
+    if (user && user.isAnonymous) {
+      user.linkWithCredential(cred).then(r => done(r.user)).catch(e => toast(authErrorMsg(e)));
+    } else {
+      auth.createUserWithEmailAndPassword(email, pw).then(r => done(r.user)).catch(e => toast(authErrorMsg(e)));
+    }
+  } else {
+    auth.signInWithEmailAndPassword(email, pw).then(r => afterLoginUser(r.user, "password"))
+      .catch(e => toast(authErrorMsg(e)));
+  }
+};
+window.doLogout = function () {
+  if (!window.firebase) { toast("❌ उपलब्ध नहीं है"); return; }
+  const auth = firebase.auth();
+  auth.signOut().then(() => {
+    const pp = U.profile;
+    pp.name = ""; pp.photo = ""; pp.email = ""; pp.provider = "anonymous"; U.profile = pp;
+    return auth.signInAnonymously();
+  }).then(c => {
+    FB.uid = c.user.uid; FB.on = true;
+    try { renderProfile(); } catch (e) {}
+    toast("✅ लॉगआउट हो गया");
+  }).catch(() => toast("❌ लॉगआउट में समस्या हुई"));
+};
+function isLoggedIn(pp) {
+  const p = pp || U.profile;
+  return !!(p.provider && p.provider !== "anonymous");
+}
+function loginSectionHTML(p) {
+  if (!FB.on) return `<div class="glass card" style="text-align:center">
+    <div style="font-size:36px">🌐</div><b>लॉगिन हेतु इंटरनेट आवश्यक</b>
+    <div style="color:var(--mut);font-size:13px">ऑनलाइन आते ही Google/Email से लॉगिन कर पाएँगे।</div></div>`;
+  if (isLoggedIn()) {
+    const badge = p.provider === "google.com" ? "🔵 Google" : p.provider === "password" ? "📧 Email" : "🔗 Linked";
+    return `<div class="glass card gold-border" style="text-align:center">
+      ${p.photo ? `<img src="${esc(p.photo)}" class="login-av" alt="">` : `<div style="font-size:52px">👤</div>`}
+      <h2 style="margin:8px 0 2px">${esc(p.name || p.username || "Student")}</h2>
+      <div style="color:var(--mut);font-size:13px">${esc(p.email || "")} • ${badge} से जुड़ा है</div>
+      <button class="btn ghost sm" style="margin-top:10px" onclick="doLogout()">🚪 लॉगआउट</button>
+    </div>`;
+  }
+  return `<div class="glass card gold-border" style="text-align:center">
+    <b>🔐 लॉगिन करें</b>
+    <div style="color:var(--mut);font-size:13px;margin:4px 0 10px">आपका XP, स्ट्रीक और डेटा सुरक्षित रहेगा।<br>बिना लॉगिन भी पूरा app चलेगा।</div>
+    <button class="btn gold" onclick="doGoogleLogin()">🔵 Google से लॉगिन</button>
+    <div style="display:flex;align-items:center;gap:8px;margin:12px 0;color:var(--mut);font-size:12px">
+      <div style="flex:1;height:1px;background:rgba(255,255,255,.12)"></div>या<div style="flex:1;height:1px;background:rgba(255,255,255,.12)"></div>
+    </div>
+    <input id="loginEmail" class="searchbox" type="email" placeholder="ईमेल पता" autocomplete="email">
+    <input id="loginPass" class="searchbox" type="password" placeholder="पासवर्ड (कम से कम 6 अक्षर)" autocomplete="current-password" style="margin-top:8px">
+    <div class="row2" style="margin-top:10px">
+      <button class="btn gold" onclick="doEmailAuth('login')">➡️ लॉगिन</button>
+      <button class="btn ghost" onclick="doEmailAuth('signup')">📝 नया account बनाएँ</button>
+    </div>
+  </div>`;
 }
 function fbPushScore() {
   if (!FB.on) return;
@@ -183,6 +341,7 @@ function fbPushScore() {
     const p = U.profile;
     FB.db.collection("leaderboard").doc(FB.uid).set({
       name: p.priv ? (p.username || "Student") : (p.name || p.username || "Student"),
+      photo: p.photo || "",
       xp: getXP(), streak: getStreak(), exam: p.exam, ts: Date.now()
     }, { merge: true });
   } catch (e) {}
@@ -190,10 +349,23 @@ function fbPushScore() {
 function fbPullAll() {
   if (!FB.on) return;
   try {
-    FB.db.collection("competitions").orderBy("startTs", "desc").limit(10).get()
-      .then(s => { const c = []; s.forEach(d => c.push(Object.assign({ id: d.id }, d.data()))); store.set("fb_comp", c); });
+    fbWatchCompetitions();
     FB.db.collection("notifications").orderBy("ts", "desc").limit(20).get()
       .then(s => { const n = []; s.forEach(d => n.push(Object.assign({ id: d.id }, d.data()))); store.set("fb_notif", n); renderNotifDot(); });
+  } catch (e) {}
+}
+// Real-time competitions listener (live battle ke liye zaroori)
+let compUnsub = null;
+function fbWatchCompetitions() {
+  if (!FB.on || compUnsub) return;
+  try {
+    compUnsub = FB.db.collection("competitions").orderBy("startTs", "desc").limit(10)
+      .onSnapshot(s => {
+        const c = []; s.forEach(d => c.push(Object.assign({ id: d.id }, d.data())));
+        store.set("fb_comp", c);
+        try { renderHomeLive(); } catch (e) {}
+        try { if (navStack[navStack.length - 1] === "scr-competition") renderComp(); } catch (e) {}
+      }, () => {});
   } catch (e) {}
 }
 
@@ -227,6 +399,13 @@ function showScreen(id, push) {
   if (id === "scr-practice" && !PR) id = "scr-practice-setup";
   if (id === "scr-mock" && !MK) id = "scr-mock-setup";
   if (id === "scr-result" && !$("resultBody").innerHTML.trim()) id = "scr-home";
+  // Live battle cleanup jab screen chhodte hain
+  if (id !== "scr-competition" && typeof compTick !== "undefined" && compTick) { clearInterval(compTick); compTick = null; }
+  if (id !== "scr-mock") { try { stopLiveWatch(); } catch (e) {} const lb = $("mkLiveBoard"); if (lb) lb.classList.add("hidden"); }
+  if (id === "scr-mock") {
+    const mlb = $("mkLiveBtn");
+    if (mlb) mlb.style.display = (typeof MK !== "undefined" && MK && MK.liveId) ? "" : "none";
+  }
   $$(".screen").forEach(s => s.classList.remove("on"));
   const el = $(id); if (!el) return;
   el.classList.add("on");
@@ -368,12 +547,11 @@ function renderHome() {
       <div><b>🔥 आज की चुनौती</b><br><small style="color:var(--mut)">10 प्रश्न • 5 मिनट • दिन ${dayNum()}</small></div>
       <span class="streak">🔥 ${getStreak()} day</span></div>
     <button class="btn ${chDone ? "ghost" : "gold"}" style="margin-top:10px" data-go="scr-challenge">${chDone ? "✅ आज पूर्ण!" : "▶️ चुनौती शुरू करें"}</button>`;
+  renderHomeExtras();
   // quick test + live
   $("homeQuickCard").innerHTML = `<div class="m-ico">🧪</div><b>क्विक टेस्ट</b><small style="color:var(--mut)">10/20/50 प्रश्न</small>`;
   $("homeQuickCard").onclick = () => showScreen("scr-mock-setup");
-  const live = (store.get("fb_comp", [])[0]);
-  $("homeLiveCard").innerHTML = `<div class="m-ico">🏆</div><b>लाइव प्रतियोगिता</b><small style="color:var(--mut)">${live ? esc(live.title || "लाइव है!") : "जल्द आ रहा है"}</small>`;
-  $("homeLiveCard").onclick = () => showScreen("scr-competition");
+  renderHomeLive();
   // rank card
   const r = myLocalRank();
   $("homeRankCard").innerHTML = `
@@ -487,6 +665,7 @@ function finishPractice() {
   const correct = PR.ok.filter(Boolean).length;
   const details = PR.qs.map((q, i) => ({ qid: q.id, subject: q.subject, topic: q.topic, ok: PR.ok[i] === true }));
   logAttempt({ kind: "practice", title: PR.title, total, correct, acc: total ? Math.round(correct / total * 100) : 0, secs: Math.round((Date.now() - PR.t0) / 1000), details });
+  store.set("last_practice_ts", Date.now());
   checkAchievements();
   PR = null;
   openGen("🎉 अभ्यास पूर्ण", `<div class="score-big">${correct}/${total}</div><div class="score-sub">एक्यूरेसी ${total ? Math.round(correct / total * 100) : 0}% • +${correct * 10} XP</div><button class="btn gold" onclick="document.getElementById('genModal').classList.add('hidden');showScreen('scr-performance')">📈 प्रदर्शन देखें</button>`);
@@ -497,7 +676,7 @@ function aiExplain(q) {
   $("aiBody").innerHTML = '<div class="spinner"></div><p>समझाया जा रहा है...</p>';
   $("aiModal").classList.remove("hidden");
   if (!GEMINI_API_KEY || GEMINI_API_KEY.indexOf("%%") === 0) {
-    $("aiBody").innerHTML = "<p>🤖 AI की अभी सेट नहीं है। सही उत्तर: <b>" + esc(q.opts[q.ans]) + "</b><br><br>" + esc(q.exp || "एक्सप्लेनेशन जल्द आ रहा है।") + "</p>";
+    $("aiBody").innerHTML = "<p>🤖 AI कुंजी अभी सेट नहीं है। सही उत्तर: <b>" + esc(q.opts[q.ans]) + "</b><br><br>" + esc(q.exp || "एक्सप्लेनेशन जल्द आ रहा है।") + "</p>";
     return;
   }
   if (!navigator.onLine) { $("aiBody").innerHTML = "<p>📡 इंटरनेट नहीं है — AI एक्सप्लेनेशन के लिए इंटरनेट आवश्यक है।</p>"; return; }
@@ -592,7 +771,7 @@ function renderMK() {
     const b = document.createElement("button");
     b.className = "opt" + (MK.ans[MK.i] === i ? " sel" : "");
     b.innerHTML = `<span class="k">${"ABCD"[i]}</span><span>${esc(o)}</span>`;
-    b.onclick = () => { MK.ans[MK.i] = i; renderMK(); renderPalette(); };
+    b.onclick = () => { MK.ans[MK.i] = i; renderMK(); renderPalette(); livePushSoon(); };
     box.appendChild(b);
   });
   $("mkMark").textContent = MK.mark[MK.i] ? "🚩 चिह्न हटाएँ" : "🚩 रिव्यू हेतु चिह्नित करें";
@@ -615,6 +794,8 @@ function mkNav(d) {
 }
 function submitMock(auto) {
   if (MK.timerId) clearInterval(MK.timerId);
+  const liveId = (MK && MK.liveId) || null;
+  const liveTitle = liveId ? MK.title : "";
   const ex = MK.ex;
   let correct = 0, wrong = 0, skipped = 0;
   const details = MK.qs.map((q, i) => {
@@ -637,11 +818,20 @@ function submitMock(auto) {
     secs, avgPerQ: total ? Math.round(secs / total) : 0, details, auto: !!auto
   };
   logAttempt(rec);
+  store.set("last_practice_ts", Date.now());
   addXP(correct * 10);
   checkAchievements();
   const resQ = MK.qs.slice(); MK = null;
+  try { stopLiveWatch(); } catch (e) {}
+  if (liveId) submitLiveFinal(liveId, rec);
   renderResult(rec, resQ);
   showScreen("scr-result");
+  if (liveId) {
+    const box = document.createElement("div");
+    box.className = "glass card"; box.id = "liveFinalBox";
+    $("resultBody").prepend(box);
+    renderLiveFinalBox(liveId, liveTitle.replace(/^🔴 /, ""), "liveFinalBox");
+  }
 }
 function renderResult(r, qs) {
   const lb = myLocalRank();
@@ -669,10 +859,14 @@ function renderResult(r, qs) {
     <button class="btn gold" id="resReview">📝 उत्तरों की समीक्षा करें</button>
     <div class="row2">
       <button class="btn ghost" id="resRetry">🔄 टेस्ट पुनः दें</button>
+      <button class="btn ghost" id="resShare">📤 स्कोर शेयर करें</button>
+    </div>
+    <div class="row2">
       <button class="btn ghost" id="resWeak">⚠️ कमज़ोर टॉपिक अभ्यास</button>
     </div>
     <div id="revBox"></div>`;
   $("resRetry").onclick = () => showScreen("scr-mock-setup");
+  $("resShare").onclick = () => shareScore(r);
   $("resWeak").onclick = () => startPractice({ mode: "weak", count: 25, title: "कमज़ोर टॉपिक अभ्यास" });
   $("resReview").onclick = () => {
     const rb = $("revBox"); rb.innerHTML = "";
@@ -715,10 +909,11 @@ function renderLB() {
   const p = U.profile;
   const { rank, pct, board } = myLocalRank();
   const dname = p.priv ? (p.username || "Student") : (p.name || p.username || "Student");
+  const meAv = (!p.priv && p.photo) ? `<img src="${esc(p.photo)}" class="login-av" style="width:52px;height:52px" alt="">` : "";
   $("lbMe").innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
     <div><small style="color:var(--mut)">आपकी रैंक</small><div class="rank-num">#${rank}</div>
-    <small style="color:var(--mut)">${getXP()} XP • शीर्ष ${pct}% • 🔥 ${getStreak()} दिन की स्ट्रीक</small></div>
-    <div style="font-size:40px">${rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : "🏅"}</div></div>`;
+    <small style="color:var(--mut)">${esc(dname)} • ${getXP()} XP • शीर्ष ${pct}% • 🔥 ${getStreak()} दिन की स्ट्रीक</small></div>
+    ${meAv || `<div style="font-size:40px">${rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : "🏅"}</div>`}</div>`;
   $("privToggle").checked = !!p.priv;
   $("privToggle").onchange = e => { const pp = U.profile; pp.priv = e.target.checked; U.profile = pp; renderLB(); };
   let html = "";
@@ -770,18 +965,269 @@ const COMP_TYPES = [
   { id: "exam-battle", name: "🎯 परीक्षा मुकाबला", desc: "50 प्रश्न • परीक्षा पैटर्न", count: 50, mins: 60 },
   { id: "grand-test", name: "👑 ग्रैंड टेस्ट", desc: "100 प्रश्न • परीक्षा पैटर्न", count: 100, mins: 120 }
 ];
+// ============================================================
+// HOME EXTRAS — exam countdown, revision reminder, question of the day
+// ============================================================
+function renderHomeExtras() {
+  const p = U.profile;
+  // 1. Exam countdown
+  const cc = $("homeCountCard");
+  if (p.targetDate) {
+    const t = new Date(p.targetDate + "T00:00:00").getTime();
+    const days = Math.ceil((t - Date.now()) / 864e5);
+    const ex = EXAMS[p.exam];
+    cc.style.display = "";
+    cc.innerHTML = days > 0
+      ? `<div style="display:flex;justify-content:space-between;align-items:center">
+           <div><small style="color:var(--mut)">🎯 ${ex ? esc(ex.name) : "लक्ष्य"} — परीक्षा में शेष</small>
+           <div style="font-size:30px;font-weight:800;color:var(--gold)">${days} <small style="font-size:14px">दिन</small></div></div>
+         <div style="font-size:40px">⏳</div></div>`
+      : days === 0
+        ? `<b>🎯 आज परीक्षा का दिन है!</b><div style="color:var(--mut);font-size:13px">शुभकामनाएँ! शांत मन से सर्वश्रेष्ठ प्रदर्शन करें।</div>`
+        : `<b>🎯 लक्ष्य तिथि निकल गई</b><div style="color:var(--mut);font-size:13px">प्रोफ़ाइल में नई तिथि सेट करें।</div>`;
+  } else cc.style.display = "none";
+  // 2. Revision reminder — weak topics aur 2+ din se koi abhyas nahi
+  const rc = $("homeRevCard");
+  const wt = weakTopics(3);
+  const lastPr = store.get("last_practice_ts", 0);
+  if (wt.length && Date.now() - lastPr > 2 * 864e5) {
+    rc.style.display = "";
+    rc.innerHTML = `<b>🔁 रिवीज़न का समय!</b>
+      <div style="color:var(--mut);font-size:13px;margin:6px 0">2+ दिन से अभ्यास नहीं हुआ। कमज़ोर टॉपिक: ${wt.map(t => esc(t.topic)).join(", ")}</div>
+      <button class="btn gold" id="btnRevGo">▶️ 5 मिनट रिवीज़न शुरू करें</button>`;
+    $("btnRevGo").onclick = () => startPractice({ mode: "weak", count: 10, title: "रिवीज़न अभ्यास" });
+  } else rc.style.display = "none";
+  // 3. Question of the day
+  const qc = $("homeQotdCard");
+  const q = seededPick(QB, "qotd" + todayKey(), 1)[0];
+  if (q) {
+    qc.style.display = "";
+    const rev = store.get("qotd_rev", "") === todayKey();
+    qc.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
+        <b>💡 आज का प्रश्न</b><small style="color:var(--mut)">${SUBJECTS[q.subject] ? SUBJECTS[q.subject].icon : ""}</small></div>
+      <div style="margin:8px 0;font-size:15px">${esc(q.q)}</div>
+      ${rev
+        ? `<div style="font-size:14px">✅ सही उत्तर: <b style="color:var(--green)">${esc(q.opts[q.ans])}</b></div>`
+        : `<button class="btn ghost sm" id="btnQotdRev">👁️ उत्तर देखें</button>`}`;
+    const br = $("btnQotdRev");
+    if (br) br.onclick = () => { store.set("qotd_rev", todayKey()); renderHomeExtras(); };
+  } else qc.style.display = "none";
+}
+// Share score card
+function shareScore(r) {
+  const txt = `🏆 RuhRank: मैंने "${r.title}" में ${r.finalScore}/${r.maxScore} स्कोर किया! (${r.pct}% स्कोर • ${r.acc}% एक्यूरेसी)\nPractice • Compete • Rank`;
+  if (navigator.share) { navigator.share({ title: "RuhRank स्कोर", text: txt }).catch(() => {}); }
+  else if (navigator.clipboard) { navigator.clipboard.writeText(txt).then(() => toast("✅ स्कोर कॉपी हो गया!")).catch(() => toast("❌ कॉपी नहीं हो सका")); }
+  else toast("❌ शेयर उपलब्ध नहीं है");
+}
+function renderHomeLive() {  const el = $("homeLiveCard"); if (!el) return;
+  const comps = store.get("fb_comp", []);
+  const live = comps.find(c => { try { return compStatus(c) === "live"; } catch (e) { return false; } });
+  const next = comps.filter(c => { try { return compStatus(c) === "upcoming"; } catch (e) { return false; } })
+    .sort((a, b) => a.startTs - b.startTs)[0];
+  const c = live || next;
+  let sub;
+  if (c) sub = live ? "🔴 " + c.title + " — लाइव है!" : "🕐 " + c.title;
+  else sub = FB.on ? "जल्द आ रहा है" : "ऑनलाइन आवश्यक";
+  el.innerHTML = `<div class="m-ico">🏆</div><b>लाइव प्रतियोगिता</b><small style="color:var(--mut)">${esc(sub)}</small>`;
+  el.onclick = () => showScreen("scr-competition");
+}
+function compStatus(c) {
+  const now = Date.now();
+  const end = c.endTs || (c.startTs + 3600000);
+  if (now < c.startTs) return "upcoming";
+  if (now <= end) return "live";
+  return "done";
+}
+function fmtCountdown(ms) {
+  ms = Math.max(0, ms);
+  const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000), s = Math.floor(ms % 60000 / 1000);
+  return (h > 0 ? h + ":" : "") + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+}
+function compDurMins(c) {
+  if (c.durationMins) return c.durationMins;
+  if (c.endTs && c.startTs) return Math.max(1, Math.round((c.endTs - c.startTs) / 60000));
+  return Math.max(1, c.questionCount || 10);
+}
+let compTick = null;
 function renderComp() {
-  const fb = store.get("fb_comp", []);
-  let html = "";
-  if (fb.length) html += `<h3 class="sec-title">🌐 लाइव / आगामी (ऑनलाइन)</h3>` + fb.map(c =>
-    `<div class="glass card"><b>${esc(c.title || "Competition")}</b><br><small style="color:var(--mut)">${esc(c.desc || "")}</small>
-    <button class="btn gold" style="margin-top:8px" onclick="startCompBattle('${esc(c.id)}')">▶️ जुड़ें</button></div>`).join("");
-  html += `<h3 class="sec-title">⚔️ मुकाबले के प्रकार</h3>` + COMP_TYPES.map(t =>
+  const body = $("compBody");
+  const botHTML = `<h3 class="sec-title">⚔️ अभ्यास मुकाबले (बॉट्स के साथ)</h3>` + COMP_TYPES.map(t =>
     `<div class="glass card"><b>${t.name}</b><br><small style="color:var(--mut)">${t.desc}</small>
     <button class="btn gold" style="margin-top:8px" onclick="startCompBattle('${t.id}')">▶️ प्रतिस्पर्धा करें</button></div>`).join("");
-  html += `<div class="glass card"><small style="color:var(--mut)">🏆 परिणाम के बाद स्वतः रैंकिंग। लाइव बैटल (निश्चित समय, सभी एक साथ) जल्द आ रहा है।</small></div>`;
-  $("compBody").innerHTML = html;
+  if (!FB.on) {
+    body.innerHTML = `<div class="glass card" style="text-align:center">
+      <div style="font-size:40px">🌐</div><b>ऑनलाइन आवश्यक</b>
+      <div style="color:var(--mut);font-size:13px;margin-top:6px">लाइव बैटल के लिए इंटरनेट आवश्यक है।<br>अभ्यास मुकाबले ऑफ़लाइन उपलब्ध हैं।</div></div>` + botHTML;
+    return;
+  }
+  const fb = store.get("fb_comp", []);
+  const joined = store.get("joined_comp", {});
+  let html = "";
+  if (fb.length) {
+    html += `<h3 class="sec-title">🔴 लाइव बैटल (ऑनलाइन)</h3>` + fb.map(c => {
+      const st = compStatus(c);
+      const meta = `📝 ${c.questionCount || 10} प्रश्न • ⏱️ ${compDurMins(c)} मिनट`;
+      let action = "";
+      if (st === "upcoming") {
+        action = `<div style="margin:8px 0"><span class="cd">🕐 शुरू होगा: <span data-cd="${esc(c.id)}">${fmtCountdown(c.startTs - Date.now())}</span></span></div>` +
+          (joined[c.id]
+            ? `<button class="btn ghost" disabled>✅ आप जुड़े हुए हैं</button>`
+            : `<button class="btn gold" style="margin-top:8px" onclick="joinLive('${esc(c.id)}')">🤝 बैटल से जुड़ें</button>`);
+      } else if (st === "live") {
+        action = `<div style="margin:8px 0"><span class="live-dot"></span> <b style="color:var(--red)">LIVE</b></div>
+          <button class="btn gold" style="margin-top:8px" onclick="startLiveBattle('${esc(c.id)}')">▶️ बैटल में प्रवेश करें</button>`;
+      } else {
+        action = `<div style="margin:8px 0;color:var(--mut)">✅ समाप्त</div>
+          <button class="btn ghost" style="margin-top:8px" onclick="viewLiveResults('${esc(c.id)}')">🏆 परिणाम देखें</button>`;
+      }
+      return `<div class="glass card"><b>${esc(c.title || "लाइव बैटल")}</b><br>
+        <small style="color:var(--mut)">${esc(c.desc || "")}</small><br>
+        <small style="color:var(--mut)">${meta}</small>${action}</div>`;
+    }).join("");
+  } else {
+    html += `<div class="glass card" style="text-align:center"><div style="font-size:36px">🏆</div>
+      <b>अभी कोई लाइव बैटल नहीं है</b><div style="color:var(--mut);font-size:13px">नया बैटल शेड्यूल होते ही यहाँ दिखेगा।</div></div>`;
+  }
+  html += botHTML;
+  body.innerHTML = html;
+  if (compTick) clearInterval(compTick);
+  compTick = setInterval(() => {
+    let flip = false;
+    document.querySelectorAll("#compBody [data-cd]").forEach(el => {
+      const c = store.get("fb_comp", []).find(x => x.id === el.dataset.cd);
+      if (!c) return;
+      const ms = c.startTs - Date.now();
+      if (ms <= 0) flip = true; else el.textContent = fmtCountdown(ms);
+    });
+    if (flip) renderComp();
+  }, 1000);
 }
+function liveDisplayName() {
+  const p = U.profile;
+  return p.priv ? (p.username || "Student") : (p.name || p.username || "Student");
+}
+function joinLiveSilent(id) {
+  if (!FB.on) return;
+  try {
+    FB.db.collection("competitions").doc(id).collection("participants").doc(FB.uid).set({
+      name: liveDisplayName(), photo: U.profile.photo || "",
+      joinedAt: Date.now(), score: 0, answered: 0, submitted: false
+    }, { merge: true }).catch(() => {});
+  } catch (e) {}
+}
+window.joinLive = function (id) {
+  if (!FB.on) { toast("🌐 ऑनलाइन आवश्यक है"); return; }
+  joinLiveSilent(id);
+  const j = store.get("joined_comp", {}); j[id] = 1; store.set("joined_comp", j);
+  toast("✅ आप बैटल से जुड़ गए हैं!");
+  setTimeout(renderComp, 800);
+};
+// ---------- live leaderboard ----------
+let liveUnsub = null, livePushT = 0;
+function stopLiveWatch() { if (liveUnsub) { try { liveUnsub(); } catch (e) {} liveUnsub = null; } }
+function liveScoreOf(p) { return (p.submitted && p.finalScore != null) ? p.finalScore : (p.score || 0); }
+function sortParts(ps) {
+  return ps.sort((a, b) => (liveScoreOf(b) - liveScoreOf(a)) || ((a.timeTaken == null ? 1e15 : a.timeTaken) - (b.timeTaken == null ? 1e15 : b.timeTaken)));
+}
+function watchLiveBoard(compId) {
+  stopLiveWatch();
+  if (!FB.on) return;
+  try {
+    liveUnsub = FB.db.collection("competitions").doc(compId).collection("participants")
+      .onSnapshot(s => {
+        const ps = []; s.forEach(d => ps.push(Object.assign({ uid: d.id }, d.data())));
+        renderLiveBoard(ps);
+      }, () => {});
+  } catch (e) {}
+}
+function renderLiveBoard(ps) {
+  const box = $("mkLiveBoard"); if (!box) return;
+  const sorted = sortParts(ps.slice());
+  const myRank = sorted.findIndex(p => p.uid === FB.uid) + 1;
+  const rows = sorted.slice(0, 10).map((p, i) =>
+    `<div class="lb-row${p.uid === FB.uid ? " me" : ""}"><span>#${i + 1}</span>
+     <span>${p.photo ? `<img src="${esc(p.photo)}" class="lb-av" alt="">` : ""}${esc(p.name || "Student")}${p.submitted ? " ✅" : ""}</span>
+     <b>${liveScoreOf(p)}</b></div>`).join("");
+  box.innerHTML = `<b>🏆 लाइव रैंकिंग</b>
+    <div style="color:var(--mut);font-size:13px;margin:4px 0">आपकी रैंक: <b style="color:var(--gold)">#${myRank || "—"}</b> • ${sorted.length} प्रतिभागी</div>
+    ${rows || "<small>प्रतिभागियों की प्रतीक्षा…</small>"}`;
+}
+function livePushSoon() {
+  if (!FB.on || !MK || !MK.liveId) return;
+  const now = Date.now();
+  if (now - livePushT < 5000) return;
+  livePushT = now;
+  try {
+    let correct = 0, answered = 0;
+    MK.qs.forEach((q, i) => { if (MK.ans[i] >= 0) { answered++; if (MK.ans[i] === q.ans) correct++; } });
+    FB.db.collection("competitions").doc(MK.liveId).collection("participants").doc(FB.uid)
+      .set({ score: correct, answered }, { merge: true }).catch(() => {});
+  } catch (e) {}
+}
+window.startLiveBattle = function (id) {
+  const c = store.get("fb_comp", []).find(x => x.id === id);
+  if (!c) { toast("प्रतियोगिता नहीं मिली"); return; }
+  if (compStatus(c) !== "live") { toast("🔴 बैटल अभी लाइव नहीं है"); return; }
+  const count = Math.min(c.questionCount || 10, QB.length);
+  const qs = seededShuffle(QB, id).slice(0, count);
+  if (!qs.length) { toast("प्रश्न नहीं मिले"); return; }
+  joinLiveSilent(id);
+  const j = store.get("joined_comp", {}); j[id] = 1; store.set("joined_comp", j);
+  const mins = Math.max(1, Math.round(((c.endTs || (c.startTs + count * 60000)) - Date.now()) / 60000));
+  livePushT = 0;
+  MK = {
+    qs, ex: { total: qs.length, mins, marks: 1, neg: 0.25, sections: {} },
+    title: "🔴 " + (c.title || "लाइव बैटल"), i: 0,
+    ans: new Array(qs.length).fill(-1), mark: new Array(qs.length).fill(false),
+    seen: new Array(qs.length).fill(false),
+    t0: Date.now(), left: mins * 60, timerId: null, qTime: new Array(qs.length).fill(0), qT0: Date.now(),
+    comp: true, liveId: id
+  };
+  MK.seen[0] = true;
+  $("mkTitle").textContent = MK.title;
+  watchLiveBoard(id);
+  MK.timerId = setInterval(() => {
+    MK.left--;
+    const m = Math.floor(MK.left / 60), s = MK.left % 60;
+    $("mkTimer").textContent = m + ":" + String(s).padStart(2, "0");
+    if (MK.left <= 0) submitMock(true);
+  }, 1000);
+  showScreen("scr-mock"); renderMK(); renderPalette();
+};
+function submitLiveFinal(compId, rec) {
+  if (!FB.on) return;
+  try {
+    FB.db.collection("competitions").doc(compId).collection("participants").doc(FB.uid).set({
+      score: rec.finalScore, correct: rec.correct, wrong: rec.wrong,
+      timeTaken: rec.secs, submitted: true, submittedAt: Date.now()
+    }, { merge: true }).catch(() => {});
+  } catch (e) {}
+}
+function renderLiveFinalBox(compId, title, mountId) {
+  const mount = $(mountId); if (!mount || !FB.on || !FB.db) return;
+  mount.innerHTML = `<b>🔴 ${esc(title)} — अंतिम रैंकिंग</b><div style="color:var(--mut);font-size:13px">लोड हो रहा है…</div>`;
+  FB.db.collection("competitions").doc(compId).collection("participants").get().then(s => {
+    const ps = []; s.forEach(d => ps.push(Object.assign({ uid: d.id }, d.data())));
+    const sorted = sortParts(ps);
+    const myRank = sorted.findIndex(p => p.uid === FB.uid) + 1;
+    const winner = sorted[0];
+    mount.innerHTML = `<b>🔴 ${esc(title)} — अंतिम रैंकिंग</b>
+      ${winner ? `<div style="margin:8px 0;font-size:15px">🏆 <b>विजेता:</b> ${esc(winner.name || "Student")} <b style="color:var(--gold)">${liveScoreOf(winner)} अंक</b></div>` : ""}
+      <div style="font-size:15px;margin-bottom:8px">आपकी रैंक: <b style="color:var(--gold)">#${myRank}</b> / ${sorted.length}</div>` +
+      sorted.slice(0, 10).map((p, i) =>
+        `<div class="lb-row${p.uid === FB.uid ? " me" : ""}"><span>#${i + 1}</span>
+         <span>${p.photo ? `<img src="${esc(p.photo)}" class="lb-av" alt="">` : ""}${esc(p.name || "Student")}</span>
+         <b>${liveScoreOf(p)}</b></div>`).join("");
+  }).catch(() => { mount.innerHTML = `<b>🔴 अंतिम रैंकिंग</b><div style="color:var(--mut)">लोड नहीं हो सका।</div>`; });
+}
+window.viewLiveResults = function (id) {
+  const c = store.get("fb_comp", []).find(x => x.id === id);
+  if (!c) { toast("प्रतियोगिता नहीं मिली"); return; }
+  $("resultBody").innerHTML = `<div class="glass card" id="vrBox"></div><button class="btn ghost" data-back>← वापस जाएँ</button>`;
+  showScreen("scr-result");
+  renderLiveFinalBox(id, c.title || "लाइव बैटल", "vrBox");
+};
 window.startCompBattle = function (id) {
   const t = COMP_TYPES.find(x => x.id === id) || COMP_TYPES[0];
   // time-windowed mock vs bots
@@ -947,14 +1393,15 @@ function renderProfile() {
   const p = U.profile;
   const ex = EXAMS[p.exam];
   const r = myLocalRank();
-  $("profBody").innerHTML = `
+  const headCard = isLoggedIn() ? "" : `
     <div class="glass card gold-border" style="text-align:center">
       <div style="font-size:52px">👤</div>
       <h2>${esc(p.name || p.username || "Student")}</h2>
       <p style="color:var(--mut)">${ex ? "🎯 " + esc(ex.name) : ""} • #${r.rank} रैंक • ${getXP()} XP</p>
       <div class="streak">🔥 ${getStreak()} day streak</div>
       <button class="btn ghost sm" style="margin-top:10px" id="pfEdit">✏️ नाम / लक्ष्य बदलें</button>
-    </div>
+    </div>`;
+  $("profBody").innerHTML = loginSectionHTML(p) + headCard + `
     <div class="set-row"><span>🌐 भाषा</span><button class="chip ${p.lang === "hi" ? "on" : ""}" id="langTgl">${p.lang === "hi" ? "हिंदी" : "English"}</button></div>
     <div class="set-row"><span>🔔 नोटिफिकेशन</span><button class="switch ${p.notif ? "on" : ""}" id="notifTgl"></button></div>
     <div class="set-row"><span>🔒 प्राइवेसी मोड</span><button class="switch ${p.priv ? "on" : ""}" id="privTgl"></button></div>
@@ -969,16 +1416,20 @@ function renderProfile() {
       <a href="https://ig.me/m/ruhvibes1" style="color:var(--gold2)">Instagram: @ruhvibes1</a></small>
       <div class="foot-note">Made with ♥ by Hasnain<br>RuhRank 1.0</div>
     </div>`;
-  $("pfEdit").onclick = () => {
+  const pfE = $("pfEdit");
+  if (pfE) pfE.onclick = () => {
     openGen("✏️ प्रोफ़ाइल", `
       <label style="font-size:13px;color:var(--mut)">नाम</label>
       <input id="fName" class="searchbox" value="${esc(p.name || "")}" placeholder="आपका नाम">
       <label style="font-size:13px;color:var(--mut)">यूज़रनेम</label>
       <input id="fUser" class="searchbox" value="${esc(p.username || "")}" placeholder="यूज़रनेम">
+      <label style="font-size:13px;color:var(--mut)">लक्ष्य परीक्षा तिथि</label>
+      <input id="fTarget" type="date" class="searchbox" value="${esc(p.targetDate || "")}">
       <button class="btn gold" id="fSave">सेव करें</button>`);
     $("fSave").onclick = () => {
       const pp = U.profile;
       pp.name = $("fName").value.trim(); pp.username = $("fUser").value.trim() || "student" + Math.floor(Math.random() * 9999);
+      pp.targetDate = $("fTarget").value || "";
       U.profile = pp; $("genModal").classList.add("hidden"); renderProfile(); toast("✅ सेव हो गया!");
     };
   };
@@ -1046,6 +1497,8 @@ function wire() {
   $("mkNext").onclick = () => mkNav(1);
   $("mkClear").onclick = () => { if (MK) { MK.ans[MK.i] = -1; renderMK(); } };
   $("mkMark").onclick = () => { if (MK) { MK.mark[MK.i] = !MK.mark[MK.i]; renderMK(); } };
+  const mlb = $("mkLiveBtn");
+  if (mlb) mlb.onclick = () => { const b = $("mkLiveBoard"); if (b) b.classList.toggle("hidden"); };
   $("mkSubmit").onclick = () => {
     if (!MK) return;
     const un = MK.ans.filter(a => a < 0).length;

@@ -87,7 +87,10 @@
     </header>
     <div class="scroll">
       <div class="glass card target-card" id="homeTargetCard"></div>
+      <div class="glass card gold-border" id="homeCountCard" style="display:none"></div>
       <div class="glass card gold-border" id="homeWeakCard" style="display:none"></div>
+      <div class="glass card" id="homeRevCard" style="display:none"></div>
+      <div class="glass card" id="homeQotdCard" style="display:none"></div>
       <div class="glass card" id="homeChallengeCard"></div>
       <div class="row2">
         <div class="glass card mini" id="homeQuickCard"></div>
@@ -168,9 +171,11 @@
   <section class="screen" id="scr-mock">
     <header class="mockbar">
       <div class="mock-title" id="mkTitle">Mock Test</div>
+      <button class="icon-btn" id="mkLiveBtn" style="display:none" title="लाइव रैंकिंग">🏆</button>
       <div class="mock-timer" id="mkTimer">60:00</div>
     </header>
     <div class="mock-body">
+      <div id="mkLiveBoard" class="liveboard hidden"></div>
       <div class="mock-main scroll">
         <div class="qmeta"><span id="mkCount"></span><span id="mkSec"></span></div>
         <div class="glass card qcard">

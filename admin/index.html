@@ -77,7 +77,8 @@ textarea{min-height:80px; resize:vertical}
 input:focus,select:focus,textarea:focus{outline:none; border-color:var(--gold)}
 .row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
 .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px}
-@media(max-width:700px){.row,.row3{grid-template-columns:1fr}}
+.row4{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px}
+@media(max-width:700px){.row,.row3,.row4{grid-template-columns:1fr}}
 button.btn{background:var(--gold); color:#111; border:none; padding:10px 20px; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px; margin-top:14px}
 button.btn:hover{background:var(--gold2)}
 button.btn.ghost{background:transparent; color:var(--txt); border:1px solid var(--line)}
@@ -247,8 +248,9 @@ footer{text-align:center; color:var(--dim); font-size:12px; padding:24px}
         <div><label>Type</label>
           <select id="cType"><option value="daily">Daily Battle (10 Qs)</option><option value="subject">Subject Battle (25 Qs)</option><option value="exam">Exam Battle (50 Qs)</option><option value="grand">Grand Test (100 Qs)</option></select></div>
       </div>
-      <div class="row3">
+      <div class="row4">
         <div><label>Start time</label><input type="datetime-local" id="cStart"></div>
+        <div><label>Duration (minutes)</label><input type="number" id="cDur" value="15" min="1" oninput="syncEnd()"></div>
         <div><label>End time</label><input type="datetime-local" id="cEnd"></div>
         <div><label>Question count</label><input type="number" id="cCount" value="10" min="1"></div>
       </div>
@@ -297,10 +299,10 @@ const ADMIN_PANEL_PASSWORD = "ruhrank2026"; // <-- change me
 
 /* ================================================================
    2) Firebase config — Hasnain will inject real config.
-   In this file, right BEFORE this script tag, paste:
-     <script>window.RR_FIREBASE_CONFIG = { apiKey:"...", authDomain:"...",
-       projectId:"...", storageBucket:"...", messagingSenderId:"...",
-       appId:"..." };</script>
+   In this file, right BEFORE this script tag, paste a separate script tag
+   setting window.RR_FIREBASE_CONFIG = { apiKey:"...", authDomain:"...",
+     projectId:"...", storageBucket:"...", messagingSenderId:"...",
+     appId:"..." };
    (Firebase console → Project settings → Your apps → Web app → copy.)
    ================================================================ */
 const firebaseConfig = window.RR_FIREBASE_CONFIG || {};
@@ -555,16 +557,37 @@ async function delDoc(col, id, reload){
 }
 
 /* ---------------- competitions ---------------- */
+function syncEnd(){
+  const start = document.getElementById('cStart').value;
+  const dur = parseInt(document.getElementById('cDur').value,10)||0;
+  if(start && dur > 0){
+    const d = new Date(new Date(start).getTime() + dur*60000);
+    const p = n => String(n).padStart(2,'0');
+    document.getElementById('cEnd').value = d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
+  }
+}
+async function compParts(id){
+  if(!db) return;
+  try{
+    const s = await db.collection('competitions').doc(id).collection('participants').get();
+    let done = 0; s.forEach(d => { if(d.data().submitted) done++; });
+    alert('👥 Participants: '+s.size+'\n✅ Submitted: '+done);
+  }catch(e){ alert('Load failed: '+e.message); }
+}
 async function saveCompetition(){
   if(!db || !needAuth()) return;
   const title = document.getElementById('cTitle').value.trim();
   const start = document.getElementById('cStart').value, end = document.getElementById('cEnd').value;
-  if(!title || !start || !end){ alert('Title, start and end time required.'); return; }
+  const dur = parseInt(document.getElementById('cDur').value,10)||0;
+  if(!title || !start){ alert('Title and start time required.'); return; }
+  const startTs = new Date(start).getTime();
+  const endTs = dur > 0 ? startTs + dur*60000 : (end ? new Date(end).getTime() : startTs + 15*60000);
   const data = {
     title,
     type: document.getElementById('cType').value,
-    startTs: new Date(start).getTime(),
-    endTs: new Date(end).getTime(),
+    startTs,
+    endTs,
+    durationMins: dur > 0 ? dur : Math.round((endTs-startTs)/60000),
     questionCount: parseInt(document.getElementById('cCount').value,10)||10,
     createdAt: Date.now()
   };
@@ -585,7 +608,7 @@ async function loadCompetitions(){
       <td>${new Date(c.startTs).toLocaleString('en-IN')}</td>
       <td>${new Date(c.endTs).toLocaleString('en-IN')}</td>
       <td>${c.questionCount} · ${st}</td>
-      <td><button class="btn small danger" onclick="delDoc('competitions','${d.id}',loadCompetitions)">Delete</button></td>
+      <td><button class="btn small" onclick="compParts('${d.id}')">👥</button> <button class="btn small danger" onclick="delDoc('competitions','${d.id}',loadCompetitions)">Delete</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" class="muted">No competitions yet.</td></tr>';
 }
