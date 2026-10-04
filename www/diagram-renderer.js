@@ -59,6 +59,11 @@ var DG_ARROW_DEF = '<defs><marker id="dgArr" viewBox="0 0 10 10" refX="8" refY="
 
 function dg_tri(d) {
   var a = dg_num(d.a), b = dg_num(d.b), c = dg_num(d.c);
+  /* alias: base+h (samkon trikon) -> karn nikaalo */
+  if (a === null && d.base !== undefined && d.h !== undefined) {
+    var bs = dg_num(d.base), hh = dg_num(d.h);
+    if (bs !== null && hh !== null) { a = bs; b = hh; c = Math.sqrt(bs * bs + hh * hh); }
+  }
   if (a === null || b === null || c === null) return '';
   if (!(a + b > c && b + c > a && a + c > b)) return '';   /* triangle inequality */
   var sc = 165 / Math.max(a, b, c);
@@ -87,8 +92,13 @@ function dg_tri(d) {
 }
 
 function dg_rect(d, square) {
-  var w = dg_num(d.w), h = dg_num(d.h);
-  if (square) { var s0 = dg_num(d.s); if (s0 === null) return ''; w = s0; h = s0; }
+  /* aliases: l/b (Hindi "lambai/chaudai") -> w/h ; sq me p (parimap) -> s */
+  var w = dg_num(d.w !== undefined ? d.w : d.l), h = dg_num(d.h !== undefined ? d.h : d.b);
+  if (square) {
+    var s0 = dg_num(d.s);
+    if (s0 === null) { var pp = dg_num(d.p); if (pp === null) return ''; s0 = pp / 4; }
+    w = s0; h = s0;
+  }
   if (w === null || h === null) return '';
   var sc = Math.min(196 / w, 112 / h);
   var W = w * sc, H = h * sc, x0 = (260 - W) / 2, y0 = (180 - H) / 2;
@@ -131,7 +141,7 @@ function dg_cube(d) {
 }
 
 function dg_cuboid(d) {
-  var l = dg_num(d.l), w = dg_num(d.w), h = dg_num(d.h);
+  var l = dg_num(d.l), w = dg_num(d.w !== undefined ? d.w : d.b), h = dg_num(d.h);
   if (l === null || w === null || h === null) return '';
   var sc = Math.min(150 / l, 96 / h);
   var lw = l * sc, lh = h * sc;
@@ -290,6 +300,23 @@ function dg_venn(d) {
 
 /* Tree: horizontal chain — boxes me members, arrows pe relation (blood relation) */
 function dg_tree(d) {
+  /* chain format adapter: rel:["A — भाई — B", ...], ask:"..." (res=answer, diagram me nahi dikhate) */
+  var askTxt = '';
+  if ((!d.members || !d.members.length) && Array.isArray(d.rel) && d.rel.length) {
+    var members = [], links = [];
+    d.rel.forEach(function (entry) {
+      var parts = String(entry).split('—').map(function (x) { return x.trim(); });
+      if (parts.length >= 3) {
+        var A = parts[0], Rl = parts[1], B = parts.slice(2).join(' — ');
+        if (A && members.indexOf(A) < 0) members.push(A);
+        if (B && members.indexOf(B) < 0) members.push(B);
+        if (A && B) links.push([A, B, Rl]);
+      }
+    });
+    if (!members.length) return '';
+    askTxt = d.ask ? String(d.ask) : '';
+    d = { members: members, links: links };
+  } else if (d.ask) { askTxt = String(d.ask); }
   var M = d.members, LK = d.links;
   if (!Array.isArray(M) || M.length < 1 || M.length > 6) return '';
   if (LK !== undefined && LK !== null && !Array.isArray(LK)) return '';
@@ -319,7 +346,7 @@ function dg_tree(d) {
       if (rel) s += dg_t((x1 + x2) / 2, 62, dg_trunc(rel, 14), 10, DG_GOLD2);
     }
   }
-  return dg_svg('0 0 260 180', s);
+  return dg_svg('0 0 260 180', s + (askTxt ? dg_t(130, 168, dg_trunc(askTxt, 42), 11, DG_MUT, 'middle') : ''));
 }
 
 /* Seating: circle me ya ek row me arrangement */
@@ -430,17 +457,89 @@ function dg_numline(d) {
 
 /* ==================== DISPATCH ==================== */
 
+/* Right triangle with right-angle marker (tri3): a,b = legs, c = hypotenuse (optional) */
+function dg_tri3(d) {
+  var a = dg_num(d.a), b = dg_num(d.b), c = dg_num(d.c);
+  if (a === null || b === null) return '';
+  if (c === null) c = Math.sqrt(a * a + b * b);
+  var sc = Math.min(170 / a, 105 / b);
+  var W = a * sc, H = b * sc, x0 = (260 - W) / 2, y1 = 148, y0 = y1 - H;
+  var s = '<polygon points="' + x0 + ',' + y1 + ' ' + x0 + ',' + y0 + ' ' + (x0 + W) + ',' + y1 +
+    '" fill="rgba(212,175,55,.12)" stroke="' + DG_GOLD + '" stroke-width="2" stroke-linejoin="round"/>';
+  var m = 11;
+  s += '<path d="M' + x0 + ',' + (y1 - m) + ' h' + m + ' v' + m + '" fill="none" stroke="' + DG_GOLD2 + '" stroke-width="2"/>';
+  s += '<circle cx="' + x0 + '" cy="' + y1 + '" r="3" fill="' + DG_GOLD + '"/>' +
+       '<circle cx="' + x0 + '" cy="' + y0 + '" r="3" fill="' + DG_GOLD + '"/>' +
+       '<circle cx="' + (x0 + W) + '" cy="' + y1 + '" r="3" fill="' + DG_GOLD + '"/>';
+  s += dg_t(x0 - 10, (y0 + y1) / 2 + 4, 'b = ' + dg_fmt(b), 12, DG_GOLD2, 'end');
+  s += dg_t((2 * x0 + W) / 2, y1 + 18, 'a = ' + dg_fmt(a), 12, DG_GOLD2);
+  s += dg_t((2 * x0 + W) / 2 + 16, (y0 + y1) / 2 - 6, 'c = ' + dg_fmt(c), 12, DG_GOLD2);
+  return dg_svg('0 0 260 180', s);
+}
+
+/* Cone (shanku): r = aadhar trijya, h = unchai */
+function dg_cone(d) {
+  var r = dg_num(d.r), h = dg_num(d.h);
+  if (r === null || h === null) return '';
+  var cx = 130, rx = 58, ry = 13, by = 138, ty = 52;
+  var s = '<ellipse cx="' + cx + '" cy="' + by + '" rx="' + rx + '" ry="' + ry +
+    '" fill="rgba(212,175,55,.06)" stroke="' + DG_GOLD + '" stroke-width="2"/>';
+  s += dg_line(cx - rx, by, cx, ty, 2) + dg_line(cx + rx, by, cx, ty, 2);
+  s += '<circle cx="' + cx + '" cy="' + ty + '" r="3" fill="' + DG_GOLD + '"/>';
+  s += dg_t(cx + rx / 2, by + 24, 'r = ' + dg_fmt(r), 12, DG_GOLD2);
+  s += dg_t(cx - rx - 8, (ty + by) / 2 + 4, 'h = ' + dg_fmt(h), 12, DG_GOLD2, 'end');
+  return dg_svg('0 0 260 180', s);
+}
+
+/* Rhombus (samchaturbhuj): d1, d2 = vikarn */
+function dg_rhombus(d) {
+  var d1 = dg_num(d.d1), d2 = dg_num(d.d2);
+  if (d1 === null || d2 === null) return '';
+  var sc = Math.min(190 / d1, 120 / d2);
+  var W = d1 * sc, H = d2 * sc, cx = 125, cy = 88;
+  var s = '<polygon points="' + cx + ',' + (cy - H / 2) + ' ' + (cx + W / 2) + ',' + cy + ' ' +
+    cx + ',' + (cy + H / 2) + ' ' + (cx - W / 2) + ',' + cy +
+    '" fill="rgba(212,175,55,.12)" stroke="' + DG_GOLD + '" stroke-width="2" stroke-linejoin="round"/>';
+  s += dg_line(cx, cy - H / 2, cx, cy + H / 2, 1.5, DG_GOLD2) +
+       dg_line(cx - W / 2, cy, cx + W / 2, cy, 1.5, DG_GOLD2);
+  s += dg_t(cx + 10, cy - H / 2 + 16, 'd1 = ' + dg_fmt(d1), 11, DG_GOLD2);
+  s += dg_t(cx + W / 2 + 8, cy + 4, 'd2 = ' + dg_fmt(d2), 11, DG_GOLD2);
+  return dg_svg('0 0 260 180', s);
+}
+
+/* Trapezium (samlamb): a,b = samantar bhujaein, h = unchai */
+function dg_trap(d) {
+  var a = dg_num(d.a), b = dg_num(d.b), h = dg_num(d.h);
+  if (a === null || b === null || h === null) return '';
+  var top = Math.min(a, b), bot = Math.max(a, b);
+  var sc = Math.min(190 / bot, 105 / h);
+  var TW = top * sc, BW = bot * sc, H = h * sc, cx = 130, y0 = 42, y1 = y0 + H;
+  var s = '<polygon points="' + (cx - TW / 2) + ',' + y0 + ' ' + (cx + TW / 2) + ',' + y0 + ' ' +
+    (cx + BW / 2) + ',' + y1 + ' ' + (cx - BW / 2) + ',' + y1 +
+    '" fill="rgba(212,175,55,.12)" stroke="' + DG_GOLD + '" stroke-width="2" stroke-linejoin="round"/>';
+  s += dg_line(cx - TW / 2 - 16, y0, cx - TW / 2 - 16, y1, 1.5, DG_GOLD2);
+  s += dg_t(cx - TW / 2 - 22, (y0 + y1) / 2 + 4, 'h = ' + dg_fmt(h), 11, DG_GOLD2, 'end');
+  s += dg_t(cx, y0 - 10, 'a = ' + dg_fmt(a), 11, DG_GOLD2);
+  s += dg_t(cx, y1 + 18, 'b = ' + dg_fmt(b), 11, DG_GOLD2);
+  return dg_svg('0 0 260 180', s);
+}
+
 function renderDiagram(d) {
   try {
     if (!d || typeof d !== 'object' || typeof d.t !== 'string') return '';
     switch (d.t) {
       case 'tri':     return dg_tri(d);
+      case 'tri3':    return dg_tri3(d);
       case 'rect':    return dg_rect(d, false);
       case 'sq':      return dg_rect(d, true);
       case 'circle':  return dg_circle(d);
       case 'cube':    return dg_cube(d);
       case 'cuboid':  return dg_cuboid(d);
       case 'cyl':     return dg_cyl(d);
+      case 'cylinder':return dg_cyl(d);
+      case 'cone':    return dg_cone(d);
+      case 'rhombus': return dg_rhombus(d);
+      case 'trap':    return dg_trap(d);
       case 'bar':     return dg_bar(d);
       case 'pie':     return dg_pie(d);
       case 'compass': return dg_compass();

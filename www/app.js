@@ -913,16 +913,23 @@ function aiExplain(q) {
 // ============================================================
 // MOCK SETUP + ENGINE (real exam interface)
 // ============================================================
-let MS = { type: "full" };
+let MS = { type: "full", exam: null };
+const MS_FEATURED = ["ssc-cgl", "rrb-ntpc", "bpssc-pre", "bpsc"];
 function renderMockSetup() {
   $$("#msTypes .mode").forEach(m => m.onclick = () => { $$("#msTypes .mode").forEach(x => x.classList.remove("on")); m.classList.add("on"); MS.type = m.dataset.t; renderMockSetup(); });
-  const ex = EXAMS[U.profile.exam] || EXAMS["ssc-cgl"];
+  if (!MS.exam) MS.exam = U.profile.exam || "ssc-cgl";
+  $("msExams").innerHTML = MS_FEATURED.map(id => {
+    const e = EXAMS[id]; if (!e) return "";
+    return `<button class="mode ${MS.exam === id ? "on" : ""}" data-ex="${id}"><b>${e.icon} ${esc(e.name)}</b><span>${e.total} प्रश्न • ${e.mins} मिनट • नेगेटिव ${e.neg === 0 ? "नहीं" : "-" + e.neg}</span></button>`;
+  }).join("");
+  $$("#msExams .mode").forEach(b => b.onclick = () => { MS.exam = b.dataset.ex; renderMockSetup(); });
+  const ex = EXAMS[MS.exam] || EXAMS["ssc-cgl"];
   $("msPattern").innerHTML = `<b>📋 ${esc(ex.name)} पैटर्न</b><br>
     <small style="color:var(--mut)">${ex.total} प्रश्न • ${ex.mins} मिनट • ${ex.marks} अंक/प्रश्न • नेगेटिव: ${ex.neg === 0 ? "नहीं" : "-" + ex.neg}<br>
     सेक्शन: ${Object.keys(ex.sections).map(s => (SUBJECTS[s] ? SUBJECTS[s].name : s) + " " + ex.sections[s]).join(" • ")}</small>`;
 }
 function buildMockQuestions() {
-  const exId = U.profile.exam || "ssc-cgl";
+  const exId = MS.exam || U.profile.exam || "ssc-cgl";
   const ex = EXAMS[exId];
   let qs = [];
   if (MS.type === "smart") {
@@ -952,7 +959,7 @@ function buildMockQuestions() {
 let MK = null;
 function startMock() {
   // lazy banks: mock ke sections wale subjects pehle load karo
-  const ex = EXAMS[U.profile.exam || "ssc-cgl"];
+  const ex = EXAMS[MS.exam || U.profile.exam || "ssc-cgl"];
   const need = (MS.type === "full" && ex) ? Object.keys(ex.sections) : BANK_DEFS.map(b => b.subj);
   ensureBanks(need).then(() => startMockNow());
 }
@@ -1797,6 +1804,7 @@ function bootMain() {
   if (__booted) return;
   __booted = true;
   wire();
+  applyTheme();
   fbInit();
   fetchRemoteQB();
   checkNet();
