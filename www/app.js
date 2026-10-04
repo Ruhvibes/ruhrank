@@ -146,20 +146,20 @@ function weakTopics(n) {
 
 // ---------- achievements ----------
 const ACH = [
-  { id: "first",   icon: "🥉", name: "First Test",    desc: "Pehla test complete karo",        check: () => store.get("history", []).length >= 1 },
-  { id: "q100",    icon: "🥈", name: "100 Questions", desc: "100 questions solve karo",        check: () => totalSolved() >= 100 },
-  { id: "q1000",   icon: "🥇", name: "1,000 Questions", desc: "1000 questions solve karo",     check: () => totalSolved() >= 1000 },
-  { id: "streak7", icon: "🔥", name: "7-Day Streak",  desc: "Lagatar 7 din practice",          check: () => getStreak() >= 7 },
-  { id: "streak30",icon: "🔥", name: "30-Day Streak", desc: "Lagatar 30 din practice",         check: () => getStreak() >= 30 },
-  { id: "acc90",   icon: "🎯", name: "90% Accuracy",  desc: "Kisi test me 90%+ accuracy",      check: () => store.get("history", []).some(h => h.acc >= 90 && h.total >= 10) },
-  { id: "top100",  icon: "🏆", name: "Top 100",       desc: "Leaderboard me Top 100",          check: () => myLocalRank().rank <= 100 },
-  { id: "top10",   icon: "👑", name: "Top 10",        desc: "Leaderboard me Top 10",           check: () => myLocalRank().rank <= 10 }
+  { id: "first",   icon: "🥉", name: "First Test",    desc: "पहला टेस्ट पूरा करें",        check: () => store.get("history", []).length >= 1 },
+  { id: "q100",    icon: "🥈", name: "100 Questions", desc: "100 प्रश्न हल करें",        check: () => totalSolved() >= 100 },
+  { id: "q1000",   icon: "🥇", name: "1,000 Questions", desc: "1000 प्रश्न हल करें",     check: () => totalSolved() >= 1000 },
+  { id: "streak7", icon: "🔥", name: "7-Day Streak",  desc: "लगातार 7 दिन अभ्यास",          check: () => getStreak() >= 7 },
+  { id: "streak30",icon: "🔥", name: "30-Day Streak", desc: "लगातार 30 दिन अभ्यास",         check: () => getStreak() >= 30 },
+  { id: "acc90",   icon: "🎯", name: "90% Accuracy",  desc: "किसी टेस्ट में 90%+ एक्यूरेसी",      check: () => store.get("history", []).some(h => h.acc >= 90 && h.total >= 10) },
+  { id: "top100",  icon: "🏆", name: "Top 100",       desc: "लीडरबोर्ड में टॉप 100",          check: () => myLocalRank().rank <= 100 },
+  { id: "top10",   icon: "👑", name: "Top 10",        desc: "लीडरबोर्ड में टॉप 10",           check: () => myLocalRank().rank <= 10 }
 ];
 function totalSolved() { return store.get("history", []).reduce((s, h) => s + (h.total || 0), 0); }
 function checkAchievements() {
   const got = store.get("ach", []);
   let changed = false;
-  ACH.forEach(a => { if (got.indexOf(a.id) < 0) { try { if (a.check()) { got.push(a.id); changed = true; notify("🏅 Achievement: " + a.name, a.desc); } } catch (e) {} } });
+  ACH.forEach(a => { if (got.indexOf(a.id) < 0) { try { if (a.check()) { got.push(a.id); changed = true; notify("🏅 उपलब्धि: " + a.name, a.desc); } } catch (e) {} } });
   if (changed) store.set("ach", got);
 }
 
@@ -223,6 +223,10 @@ function fetchRemoteQB() {
 const NAV_SCREENS = ["scr-home", "scr-practice-setup", "scr-mock-setup", "scr-leaderboard", "scr-profile"];
 let navStack = [];
 function showScreen(id, push) {
+  // Guard: session-bound screens need an active session; else redirect (no dead screens)
+  if (id === "scr-practice" && !PR) id = "scr-practice-setup";
+  if (id === "scr-mock" && !MK) id = "scr-mock-setup";
+  if (id === "scr-result" && !$("resultBody").innerHTML.trim()) id = "scr-home";
   $$(".screen").forEach(s => s.classList.remove("on"));
   const el = $(id); if (!el) return;
   el.classList.add("on");
@@ -232,7 +236,8 @@ function showScreen(id, push) {
     "scr-home": renderHome, "scr-leaderboard": renderLB, "scr-challenge": renderChallenge,
     "scr-competition": renderComp, "scr-performance": renderPerf, "scr-ca": renderCA,
     "scr-bookmarks": renderBookmarks, "scr-achievements": renderAch, "scr-profile": renderProfile,
-    "scr-notifications": renderNotifs, "scr-practice-setup": renderPracticeSetup, "scr-mock-setup": renderMockSetup
+    "scr-notifications": renderNotifs, "scr-practice-setup": renderPracticeSetup, "scr-mock-setup": renderMockSetup,
+    "scr-search": renderSearch, "scr-pyq": renderPYQScreen
   };
   if (R[id]) try { R[id](); } catch (e) { console.log(e); }
   el.querySelector(".scroll") && (el.querySelector(".scroll").scrollTop = 0);
@@ -261,7 +266,7 @@ document.addEventListener("backbutton", () => { if (!window.androidBack()) { try
 function netBanner(show) { /* slim banner hook */ }
 function requireNet() {
   if (navigator.onLine) return true;
-  openGen("📡 Internet chahiye", "<p style='color:var(--mut)'>Ye feature online hai — Leaderboard, Competition aur naye updates ke liye internet on karo, phir retry dabao.</p><button class='btn gold' onclick=\"document.getElementById('genModal').classList.add('hidden')\">Samajh gaya</button>");
+  openGen("📡 इंटरनेट आवश्यक है", "<p style='color:var(--mut)'>यह सुविधा ऑनलाइन है — लीडरबोर्ड, प्रतियोगिता और नए अपडेट के लिए इंटरनेट चालू करें, फिर पुनः प्रयास करें।</p><button class='btn gold' onclick=\"document.getElementById('genModal').classList.add('hidden')\">समझ गया</button>");
   return false;
 }
 function checkNet() {
@@ -276,17 +281,17 @@ window.addEventListener("offline", checkNet);
 // ============================================================
 const VJSON = "https://raw.githubusercontent.com/Ruhvibes/ruhrank/main/version.json";
 function checkUpdate(manual) {
-  if (!navigator.onLine) { if (manual) toast("Internet nahi hai"); return; }
+  if (!navigator.onLine) { if (manual) toast("इंटरनेट नहीं है"); return; }
   fetch(VJSON + "?t=" + Date.now()).then(r => r.json()).then(j => {
     let vc = 0;
     try { vc = (typeof Android !== "undefined" && Android.getVersionCode) ? Android.getVersionCode() : 0; } catch (e) {}
     if (j && j.versionCode > vc) {
-      $("updateNotes").textContent = (j.notes_hi || "Naya update aa gaya hai!") + " (v" + j.versionName + ")";
+      $("updateNotes").textContent = (j.notes_hi || "नया अपडेट आ गया है!") + " (v" + j.versionName + ")";
       $("updateDialog").classList.remove("hidden");
       $("btnDoUpdate").onclick = () => { try { Android.downloadApk(j.apk); } catch (e) { window.open(j.apk, "_blank"); } $("updateDialog").classList.add("hidden"); };
-    } else if (manual) toast("Sab latest hai ✅");
+    } else if (manual) toast("सब कुछ नवीनतम है ✅");
     store.set("upd_check", todayKey());
-  }).catch(() => { if (manual) toast("Check nahi ho paya"); });
+  }).catch(() => { if (manual) toast("जाँच नहीं हो पाई"); });
 }
 
 // ============================================================
@@ -319,7 +324,7 @@ function openGen(title, html) {
 function examCardHTML(id, sel) {
   const e = EXAMS[id];
   return `<button class="exam ${sel === id ? "sel" : ""}" data-exam="${id}">
-    <div class="e-ico">${e.icon}</div><b>${esc(e.name)}</b><small>${esc(e.cat)} • ${e.total}Q</small></button>`;
+    <div class="e-ico">${e.icon}</div><b>${esc(e.name)}</b><small>${esc(e.cat)} • ${e.total} प्रश्न</small></button>`;
 }
 function renderOnboard() {
   $("onboardExams").innerHTML = EXAM_CATS.map(c =>
@@ -330,7 +335,7 @@ function renderOnboard() {
     const p = U.profile; p.exam = b.dataset.exam; U.profile = p;
     store.set("onboard", true);
     showScreen("scr-home");
-    toast("🎯 Target set: " + EXAMS[p.exam].name);
+    toast("🎯 लक्ष्य तय: " + EXAMS[p.exam].name);
   });
 }
 
@@ -343,39 +348,39 @@ function renderHome() {
   // target card
   $("homeTargetCard").innerHTML = `
     <div class="t-ico">${ex ? ex.icon : "🎯"}</div>
-    <div style="flex:1"><small>MY TARGET EXAM</small><h3>${ex ? esc(ex.name) : "Select karo"}</h3>
-    <small>${ex ? ex.total + " Q • " + ex.mins + " min • -" + ex.neg : ""}</small></div>
-    <button class="btn sm gold" style="width:auto" data-go="scr-onboard">Change</button>`;
+    <div style="flex:1"><small>लक्ष्य परीक्षा</small><h3>${ex ? esc(ex.name) : "चुनें"}</h3>
+    <small>${ex ? ex.total + " प्रश्न • " + ex.mins + " मिनट • -" + ex.neg : ""}</small></div>
+    <button class="btn sm gold" style="width:auto" data-go="scr-onboard">बदलें</button>`;
   // weak / personalized practice card
   const wt = weakTopics(3);
   const wc = $("homeWeakCard");
   if (wt.length) {
     wc.style.display = "";
-    wc.innerHTML = `<b>🤖 ${esc(p.name || "Tumhare")} liye aaj ${wt.reduce((s, t) => s + Math.min(t.att, 10), 0)} weak-topic questions ready hain</b>
+    wc.innerHTML = `<b>🤖 ${esc(p.name || "आपके")} लिए आज ${wt.reduce((s, t) => s + Math.min(t.att, 10), 0)} कमज़ोर टॉपिक के प्रश्न तैयार हैं</b>
       <div style="color:var(--mut);font-size:13px;margin:6px 0">${wt.map(t => "⚠️ " + esc(t.topic) + " (" + t.acc + "%)").join("<br>")}</div>
-      <button class="btn gold" id="btnWeakGo">▶️ Weak Topics Practice</button>`;
+      <button class="btn gold" id="btnWeakGo">▶️ कमज़ोर टॉपिक अभ्यास</button>`;
     $("btnWeakGo").onclick = () => startPractice({ mode: "weak", count: 25 });
   } else wc.style.display = "none";
   // challenge card
   const chDone = store.get("ch_done", "") === todayKey();
   $("homeChallengeCard").innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <div><b>🔥 Today's Challenge</b><br><small style="color:var(--mut)">10 Questions • 5 Minutes • Day ${dayNum()}</small></div>
+      <div><b>🔥 आज की चुनौती</b><br><small style="color:var(--mut)">10 प्रश्न • 5 मिनट • दिन ${dayNum()}</small></div>
       <span class="streak">🔥 ${getStreak()} day</span></div>
-    <button class="btn ${chDone ? "ghost" : "gold"}" style="margin-top:10px" data-go="scr-challenge">${chDone ? "✅ Aaj complete!" : "▶️ Start Challenge"}</button>`;
+    <button class="btn ${chDone ? "ghost" : "gold"}" style="margin-top:10px" data-go="scr-challenge">${chDone ? "✅ आज पूर्ण!" : "▶️ चुनौती शुरू करें"}</button>`;
   // quick test + live
-  $("homeQuickCard").innerHTML = `<div class="m-ico">🧪</div><b>Quick Test</b><small style="color:var(--mut)">10/20/50 Q</small>`;
+  $("homeQuickCard").innerHTML = `<div class="m-ico">🧪</div><b>क्विक टेस्ट</b><small style="color:var(--mut)">10/20/50 प्रश्न</small>`;
   $("homeQuickCard").onclick = () => showScreen("scr-mock-setup");
   const live = (store.get("fb_comp", [])[0]);
-  $("homeLiveCard").innerHTML = `<div class="m-ico">🏆</div><b>Live Competition</b><small style="color:var(--mut)">${live ? esc(live.title || "Live hai!") : "Jaldi aa raha"}</small>`;
+  $("homeLiveCard").innerHTML = `<div class="m-ico">🏆</div><b>लाइव प्रतियोगिता</b><small style="color:var(--mut)">${live ? esc(live.title || "लाइव है!") : "जल्द आ रहा है"}</small>`;
   $("homeLiveCard").onclick = () => showScreen("scr-competition");
   // rank card
   const r = myLocalRank();
   $("homeRankCard").innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <div><small style="color:var(--mut)">MY RANK</small><div class="rank-num">#${r.rank}</div>
-      <small style="color:var(--mut)">Top ${r.pct}% students me • ${getXP()} XP</small></div>
-      <button class="btn sm gold" style="width:auto" data-go="scr-leaderboard">Rank →</button></div>`;
+      <div><small style="color:var(--mut)">मेरी रैंक</small><div class="rank-num">#${r.rank}</div>
+      <small style="color:var(--mut)">शीर्ष ${r.pct}% विद्यार्थियों में • ${getXP()} XP</small></div>
+      <button class="btn sm gold" style="width:auto" data-go="scr-leaderboard">रैंक →</button></div>`;
   // popular exams
   $("homeExams").innerHTML = Object.keys(EXAMS).slice(0, 8).map(id => examCardHTML(id, p.exam)).join("");
   $$("#homeExams .exam").forEach(b => b.onclick = () => {
@@ -397,7 +402,7 @@ function renderPracticeSetup() {
   $$("#psSubjects .chip").forEach(c => c.onclick = () => { PS.subject = c.dataset.s; PS.topic = "all"; renderPracticeSetup(); });
   const topics = ["all"].concat(Array.from(new Set(QB.filter(q => q.subject === PS.subject).map(q => q.topic))));
   $("psTopics").innerHTML = topics.map(t =>
-    `<button class="chip ${PS.topic === t ? "on" : ""}" data-t="${esc(t)}">${t === "all" ? "All Topics" : esc(t)}</button>`).join("");
+    `<button class="chip ${PS.topic === t ? "on" : ""}" data-t="${esc(t)}">${t === "all" ? "सभी टॉपिक" : esc(t)}</button>`).join("");
   $$("#psTopics .chip").forEach(c => c.onclick = () => { PS.topic = c.dataset.t; renderPracticeSetup(); });
   $$("#psCounts .chip").forEach(c => c.onclick = () => { $$("#psCounts .chip").forEach(x => x.classList.remove("on")); c.classList.add("on"); PS.count = +c.dataset.n; });
   $$("#psModes .mode").forEach(m => m.onclick = () => { $$("#psModes .mode").forEach(x => x.classList.remove("on")); m.classList.add("on"); PS.mode = m.dataset.m; });
@@ -424,7 +429,7 @@ function pickQuestions(opts) {
 let PR = null;
 function startPractice(opts) {
   const qs = pickQuestions(opts);
-  if (!qs.length) { toast("Is filter me questions nahi mile"); return; }
+  if (!qs.length) { toast("इस फ़िल्टर में प्रश्न नहीं मिले"); return; }
   PR = { qs, i: 0, ans: new Array(qs.length).fill(-1), ok: new Array(qs.length).fill(null), t0: Date.now(), mode: opts.mode || "practice", title: opts.title || "Practice", timed: (opts.mode === "timed") ? 60 * qs.length : 0, timerId: null };
   if (PR.timed) PR.timerId = setInterval(() => {
     PR.timed--;
@@ -474,7 +479,7 @@ function renderPR() {
 function showExp(q, picked) {
   const ex = $("prExp");
   ex.classList.remove("hidden");
-  ex.innerHTML = (picked === q.ans ? "<b>✅ Sahi!</b><br>" : "<b>❌ Galat.</b> Sahi jawab: <b>" + esc(q.opts[q.ans]) + "</b><br>") + esc(q.exp || "");
+  ex.innerHTML = (picked === q.ans ? "<b>✅ सही!</b><br>" : "<b>❌ गलत।</b> सही उत्तर: <b>" + esc(q.opts[q.ans]) + "</b><br>") + esc(q.exp || "");
 }
 function finishPractice() {
   if (PR.timerId) clearInterval(PR.timerId);
@@ -484,26 +489,26 @@ function finishPractice() {
   logAttempt({ kind: "practice", title: PR.title, total, correct, acc: total ? Math.round(correct / total * 100) : 0, secs: Math.round((Date.now() - PR.t0) / 1000), details });
   checkAchievements();
   PR = null;
-  openGen("🎉 Practice Complete", `<div class="score-big">${correct}/${total}</div><div class="score-sub">Accuracy ${total ? Math.round(correct / total * 100) : 0}% • +${correct * 10} XP</div><button class="btn gold" onclick="document.getElementById('genModal').classList.add('hidden');showScreen('scr-performance')">📈 Performance dekho</button>`);
+  openGen("🎉 अभ्यास पूर्ण", `<div class="score-big">${correct}/${total}</div><div class="score-sub">एक्यूरेसी ${total ? Math.round(correct / total * 100) : 0}% • +${correct * 10} XP</div><button class="btn gold" onclick="document.getElementById('genModal').classList.add('hidden');showScreen('scr-performance')">📈 प्रदर्शन देखें</button>`);
 }
 
 // ---- AI Explain ----
 function aiExplain(q) {
-  $("aiBody").innerHTML = '<div class="spinner"></div><p>Samjhaya ja raha hai...</p>';
+  $("aiBody").innerHTML = '<div class="spinner"></div><p>समझाया जा रहा है...</p>';
   $("aiModal").classList.remove("hidden");
   if (!GEMINI_API_KEY || GEMINI_API_KEY.indexOf("%%") === 0) {
-    $("aiBody").innerHTML = "<p>🤖 AI key abhi set nahi hai. Sahi jawab: <b>" + esc(q.opts[q.ans]) + "</b><br><br>" + esc(q.exp || "Explanation jald aa rahi hai.") + "</p>";
+    $("aiBody").innerHTML = "<p>🤖 AI की अभी सेट नहीं है। सही उत्तर: <b>" + esc(q.opts[q.ans]) + "</b><br><br>" + esc(q.exp || "एक्सप्लेनेशन जल्द आ रहा है।") + "</p>";
     return;
   }
-  if (!navigator.onLine) { $("aiBody").innerHTML = "<p>📡 Internet nahi hai — AI explanation ke liye internet chahiye.</p>"; return; }
-  const prompt = "Is competitive exam question ko bahut simple Hindi me samjhao (2-4 lines). Question: " + q.q + " Options: " + q.opts.join(" | ") + " Sahi jawab: " + q.opts[q.ans];
+  if (!navigator.onLine) { $("aiBody").innerHTML = "<p>📡 इंटरनेट नहीं है — AI एक्सप्लेनेशन के लिए इंटरनेट आवश्यक है।</p>"; return; }
+  const prompt = "इस प्रतिस्पर्धी परीक्षा के प्रश्न को बहुत सरल हिंदी में समझाएँ (2-4 पंक्तियाँ)। प्रश्न: " + q.q + " विकल्प: " + q.opts.join(" | ") + " सही उत्तर: " + q.opts[q.ans];
   fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=" + GEMINI_API_KEY, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
   }).then(r => r.json()).then(j => {
     const t = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
-    $("aiBody").innerHTML = t ? "<p>" + esc(t).replace(/\n/g, "<br>") + "</p>" : "<p>AI se jawab nahi mila. Phir try karo.</p>";
-  }).catch(() => { $("aiBody").innerHTML = "<p>⚠️ AI se connect nahi ho paya. Internet check karke phir try karo.</p>"; });
+    $("aiBody").innerHTML = t ? "<p>" + esc(t).replace(/\n/g, "<br>") + "</p>" : "<p>AI से उत्तर नहीं मिला। पुनः प्रयास करें।</p>";
+  }).catch(() => { $("aiBody").innerHTML = "<p>⚠️ AI से कनेक्ट नहीं हो पाया। इंटरनेट जाँचकर पुनः प्रयास करें।</p>"; });
 }
 
 // ============================================================
@@ -513,9 +518,9 @@ let MS = { type: "full" };
 function renderMockSetup() {
   $$("#msTypes .mode").forEach(m => m.onclick = () => { $$("#msTypes .mode").forEach(x => x.classList.remove("on")); m.classList.add("on"); MS.type = m.dataset.t; renderMockSetup(); });
   const ex = EXAMS[U.profile.exam] || EXAMS["ssc-cgl"];
-  $("msPattern").innerHTML = `<b>📋 ${esc(ex.name)} Pattern</b><br>
-    <small style="color:var(--mut)">${ex.total} Questions • ${ex.mins} min • ${ex.marks} marks/Q • Negative: ${ex.neg === 0 ? "None" : "-" + ex.neg}<br>
-    Sections: ${Object.keys(ex.sections).map(s => (SUBJECTS[s] ? SUBJECTS[s].name : s) + " " + ex.sections[s]).join(" • ")}</small>`;
+  $("msPattern").innerHTML = `<b>📋 ${esc(ex.name)} पैटर्न</b><br>
+    <small style="color:var(--mut)">${ex.total} प्रश्न • ${ex.mins} मिनट • ${ex.marks} अंक/प्रश्न • नेगेटिव: ${ex.neg === 0 ? "नहीं" : "-" + ex.neg}<br>
+    सेक्शन: ${Object.keys(ex.sections).map(s => (SUBJECTS[s] ? SUBJECTS[s].name : s) + " " + ex.sections[s]).join(" • ")}</small>`;
 }
 function buildMockQuestions() {
   const exId = U.profile.exam || "ssc-cgl";
@@ -529,12 +534,12 @@ function buildMockQuestions() {
     const fresh = QB.filter(q => !seen.has(q.id));
     const pool = weak.concat(fresh.filter(q => weak.indexOf(q) < 0)).concat(QB);
     qs = pool.slice(0, ex.total);
-    return { qs, title: "🤖 Smart Test", ex };
+    return { qs, title: "🤖 स्मार्ट टेस्ट", ex };
   }
   if (MS.type === "pyq") {
     const pyq = QB.filter(q => q.pyq);
     qs = (pyq.length ? pyq : QB).slice(0, ex.total);
-    return { qs, title: "📄 PYQ Test", ex };
+    return { qs, title: "📄 PYQ टेस्ट", ex };
   }
   // full mock: section-wise
   Object.keys(ex.sections).forEach(s => {
@@ -543,12 +548,12 @@ function buildMockQuestions() {
     qs = qs.concat(shuffle(pool).slice(0, ex.sections[s]));
   });
   if (qs.length < ex.total) qs = qs.concat(shuffle(QB).slice(0, ex.total - qs.length));
-  return { qs: qs.slice(0, ex.total), title: "🧪 " + ex.name + " Mock", ex };
+  return { qs: qs.slice(0, ex.total), title: "🧪 " + ex.name + " मॉक", ex };
 }
 let MK = null;
 function startMock() {
   const b = buildMockQuestions();
-  if (!b.qs.length) { toast("Questions nahi mile"); return; }
+  if (!b.qs.length) { toast("प्रश्न नहीं मिले"); return; }
   MK = {
     qs: b.qs, ex: b.ex, title: b.title, i: 0,
     ans: new Array(b.qs.length).fill(-1),
@@ -564,7 +569,7 @@ function startMock() {
     const t = $("mkTimer");
     t.textContent = m + ":" + String(s).padStart(2, "0");
     t.classList.toggle("low", MK.left < 300);
-    if (MK.left <= 0) { toast("⏰ Time khatm! Auto-submit..."); submitMock(true); }
+    if (MK.left <= 0) { toast("⏰ समय समाप्त! ऑटो-सबमिट हो रहा है..."); submitMock(true); }
   }, 1000);
   showScreen("scr-mock");
   renderMK(); renderPalette();
@@ -590,7 +595,7 @@ function renderMK() {
     b.onclick = () => { MK.ans[MK.i] = i; renderMK(); renderPalette(); };
     box.appendChild(b);
   });
-  $("mkMark").textContent = MK.mark[MK.i] ? "🚩 Unmark Review" : "🚩 Mark for Review";
+  $("mkMark").textContent = MK.mark[MK.i] ? "🚩 चिह्न हटाएँ" : "🚩 रिव्यू हेतु चिह्नित करें";
   renderPalette();
 }
 function renderPalette() {
@@ -644,31 +649,31 @@ function renderResult(r, qs) {
   $("resultBody").innerHTML = `
     <div class="glass card gold-border">
       <div class="score-big">${r.finalScore}</div>
-      <div class="score-sub">${esc(r.title)} • ${r.pct}% score</div>
+      <div class="score-sub">${esc(r.title)} • ${r.pct}% स्कोर</div>
       <div class="stat-grid">
-        <div class="stat"><div class="v" style="color:var(--green)">${r.correct}</div><small>✅ Correct</small></div>
-        <div class="stat"><div class="v" style="color:var(--red)">${r.wrong}</div><small>❌ Wrong</small></div>
-        <div class="stat"><div class="v">${r.skipped}</div><small>⏭️ Skipped</small></div>
-        <div class="stat"><div class="v">${r.acc}%</div><small>🎯 Accuracy</small></div>
-        <div class="stat"><div class="v">${Math.floor(r.secs / 60)}m ${r.secs % 60}s</div><small>⏱️ Time Taken</small></div>
-        <div class="stat"><div class="v">${r.avgPerQ}s</div><small>Avg / Question</small></div>
-        <div class="stat"><div class="v" style="color:var(--red)">-${r.negMarks}</div><small>Negative Marks</small></div>
-        <div class="stat"><div class="v">+${r.correct * 10}</div><small>XP Earned</small></div>
+        <div class="stat"><div class="v" style="color:var(--green)">${r.correct}</div><small>✅ सही</small></div>
+        <div class="stat"><div class="v" style="color:var(--red)">${r.wrong}</div><small>❌ गलत</small></div>
+        <div class="stat"><div class="v">${r.skipped}</div><small>⏭️ छोड़े गए</small></div>
+        <div class="stat"><div class="v">${r.acc}%</div><small>🎯 एक्यूरेसी</small></div>
+        <div class="stat"><div class="v">${Math.floor(r.secs / 60)}m ${r.secs % 60}s</div><small>⏱️ लिया गया समय</small></div>
+        <div class="stat"><div class="v">${r.avgPerQ}s</div><small>औसत / प्रश्न</small></div>
+        <div class="stat"><div class="v" style="color:var(--red)">-${r.negMarks}</div><small>नेगेटिव अंक</small></div>
+        <div class="stat"><div class="v">+${r.correct * 10}</div><small>अर्जित XP</small></div>
       </div>
     </div>
     <div class="glass card">
-      <b>🏆 Competition Result</b>
-      <div style="font-size:15px;margin-top:8px">Your Rank: <b style="color:var(--gold)">#${lb.rank}</b></div>
-      <div style="color:var(--mut);font-size:13px">You performed better than ${pct}% students.</div>
+      <b>🏆 प्रतियोगिता परिणाम</b>
+      <div style="font-size:15px;margin-top:8px">आपकी रैंक: <b style="color:var(--gold)">#${lb.rank}</b></div>
+      <div style="color:var(--mut);font-size:13px">आप ${pct}% विद्यार्थियों से बेहतर रहे।</div>
     </div>
-    <button class="btn gold" id="resReview">📝 Review Answers</button>
+    <button class="btn gold" id="resReview">📝 उत्तरों की समीक्षा करें</button>
     <div class="row2">
-      <button class="btn ghost" id="resRetry">🔄 Retry Test</button>
-      <button class="btn ghost" id="resWeak">⚠️ Practice Weak Topics</button>
+      <button class="btn ghost" id="resRetry">🔄 टेस्ट पुनः दें</button>
+      <button class="btn ghost" id="resWeak">⚠️ कमज़ोर टॉपिक अभ्यास</button>
     </div>
     <div id="revBox"></div>`;
   $("resRetry").onclick = () => showScreen("scr-mock-setup");
-  $("resWeak").onclick = () => startPractice({ mode: "weak", count: 25, title: "Weak Topics Practice" });
+  $("resWeak").onclick = () => startPractice({ mode: "weak", count: 25, title: "कमज़ोर टॉपिक अभ्यास" });
   $("resReview").onclick = () => {
     const rb = $("revBox"); rb.innerHTML = "";
     qs.forEach((q, i) => {
@@ -676,7 +681,7 @@ function renderResult(r, qs) {
       const div = document.createElement("div");
       div.className = "glass card rev-q";
       div.innerHTML = `<div class="rq"><b>Q${i + 1}.</b> ${esc(q.q)} ${d.ok === true ? "✅" : d.ok === false ? "❌" : "⏭️"}</div>
-        <div style="font-size:13px;color:var(--mut)">Sahi: <b style="color:var(--green)">${esc(q.opts[q.ans])}</b></div>
+        <div style="font-size:13px;color:var(--mut)">सही: <b style="color:var(--green)">${esc(q.opts[q.ans])}</b></div>
         <div style="font-size:13px;margin-top:4px">${esc(q.exp || "")}</div>
         <button class="btn sm ghost" style="margin-top:8px">🤖 Explain</button>`;
       div.querySelector("button").onclick = () => aiExplain(q);
@@ -711,21 +716,21 @@ function renderLB() {
   const { rank, pct, board } = myLocalRank();
   const dname = p.priv ? (p.username || "Student") : (p.name || p.username || "Student");
   $("lbMe").innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
-    <div><small style="color:var(--mut)">TUMHARI RANK</small><div class="rank-num">#${rank}</div>
-    <small style="color:var(--mut)">${getXP()} XP • Top ${pct}% • 🔥 ${getStreak()} day streak</small></div>
+    <div><small style="color:var(--mut)">आपकी रैंक</small><div class="rank-num">#${rank}</div>
+    <small style="color:var(--mut)">${getXP()} XP • शीर्ष ${pct}% • 🔥 ${getStreak()} दिन की स्ट्रीक</small></div>
     <div style="font-size:40px">${rank <= 3 ? ["🥇", "🥈", "🥉"][rank - 1] : "🏅"}</div></div>`;
   $("privToggle").checked = !!p.priv;
   $("privToggle").onchange = e => { const pp = U.profile; pp.priv = e.target.checked; U.profile = pp; renderLB(); };
   let html = "";
   board.slice(0, 50).forEach((b, i) => {
     const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "#" + (i + 1);
-    const nm = b.me ? esc(dname) + " (Tum)" : esc(b.name);
+    const nm = b.me ? esc(dname) + " (आप)" : esc(b.name);
     html += `<div class="lb-row ${b.me ? "me" : ""}"><div class="lb-pos">${medal}</div>
-      <div class="lb-info"><b>${nm}</b><small>${b.me ? "🔥 " + getStreak() + " day streak" : "Competitor"}</small></div>
+      <div class="lb-info"><b>${nm}</b><small>${b.me ? "🔥 " + getStreak() + " दिन की स्ट्रीक" : "प्रतियोगी"}</small></div>
       <div class="lb-xp">${b.xp} XP</div></div>`;
   });
-  if (FB.on) html = `<div style="color:var(--green);font-size:12px;margin-bottom:8px">🌐 Online leaderboard active</div>` + html;
-  else html = `<div style="color:var(--mut);font-size:12px;margin-bottom:8px">📱 Local leaderboard — internet + Firebase se online ranking</div>` + html;
+  if (FB.on) html = `<div style="color:var(--green);font-size:12px;margin-bottom:8px">🌐 ऑनलाइन लीडरबोर्ड सक्रिय</div>` + html;
+  else html = `<div style="color:var(--mut);font-size:12px;margin-bottom:8px">📱 लोकल लीडरबोर्ड — इंटरनेट + Firebase से ऑनलाइन रैंकिंग</div>` + html;
   $("lbList").innerHTML = html;
 }
 
@@ -739,19 +744,19 @@ function renderChallenge() {
     <div class="glass card gold-border" style="text-align:center">
       <div style="font-size:44px">🔥</div>
       <h2>DAY ${dayNum()}</h2>
-      <p style="color:var(--mut)">10 Questions • 5 Minutes</p>
-      <div class="streak" style="font-size:18px">🔥 ${getStreak()} Day Streak</div>
+      <p style="color:var(--mut)">10 प्रश्न • 5 मिनट</p>
+      <div class="streak" style="font-size:18px">🔥 ${getStreak()} दिन की स्ट्रीक</div>
       <div style="display:flex;gap:6px;justify-content:center;margin:12px 0">
-        ${[1, 7, 30, 100].map(d => `<div class="stat" style="padding:8px"><div class="v" style="font-size:15px">${getStreak() >= d ? "🔥" : "·"}</div><small>${d}d</small></div>`).join("")}
+        ${[1, 7, 30, 100].map(d => `<div class="stat" style="padding:8px"><div class="v" style="font-size:15px">${getStreak() >= d ? "🔥" : "·"}</div><small>${d} दिन</small></div>`).join("")}
       </div>
-      <button class="btn ${done ? "ghost" : "gold"} big" id="btnChGo" ${done ? "disabled" : ""}>${done ? "✅ Aaj ka challenge complete!" : "▶️ Start Challenge"}</button>
+      <button class="btn ${done ? "ghost" : "gold"} big" id="btnChGo" ${done ? "disabled" : ""}>${done ? "✅ आज की चुनौती पूर्ण!" : "▶️ चुनौती शुरू करें"}</button>
     </div>`;
   if (!done) $("btnChGo").onclick = () => {
     // 10Q timed practice; on finish mark done
     const oldFinish = finishPractice;
     startPractice({ mode: "timed", count: 10, title: "Daily Challenge" });
     const iv = setInterval(() => {
-      if (!PR) { clearInterval(iv); store.set("ch_done", todayKey()); addXP(50); notify("🔥 Challenge complete!", "+50 bonus XP mile!"); }
+      if (!PR) { clearInterval(iv); store.set("ch_done", todayKey()); addXP(50); notify("🔥 चुनौती पूर्ण!", "+50 बोनस XP मिले!"); }
     }, 1000);
   };
 }
@@ -760,28 +765,28 @@ function renderChallenge() {
 // COMPETITION
 // ============================================================
 const COMP_TYPES = [
-  { id: "daily-battle", name: "⚔️ Daily Battle", desc: "10 Questions • sabse tez", count: 10, mins: 10 },
-  { id: "subject-battle", name: "📚 Subject Battle", desc: "25 Questions • ek subject", count: 25, mins: 25 },
-  { id: "exam-battle", name: "🎯 Exam Battle", desc: "50 Questions • exam pattern", count: 50, mins: 60 },
-  { id: "grand-test", name: "👑 Grand Test", desc: "100 Questions • asli jung", count: 100, mins: 120 }
+  { id: "daily-battle", name: "⚔️ दैनिक मुकाबला", desc: "10 प्रश्न • सबसे तेज़", count: 10, mins: 10 },
+  { id: "subject-battle", name: "📚 विषय मुकाबला", desc: "25 प्रश्न • एक विषय", count: 25, mins: 25 },
+  { id: "exam-battle", name: "🎯 परीक्षा मुकाबला", desc: "50 प्रश्न • परीक्षा पैटर्न", count: 50, mins: 60 },
+  { id: "grand-test", name: "👑 ग्रैंड टेस्ट", desc: "100 प्रश्न • परीक्षा पैटर्न", count: 100, mins: 120 }
 ];
 function renderComp() {
   const fb = store.get("fb_comp", []);
   let html = "";
-  if (fb.length) html += `<h3 class="sec-title">🌐 Live / Upcoming (Online)</h3>` + fb.map(c =>
+  if (fb.length) html += `<h3 class="sec-title">🌐 लाइव / आगामी (ऑनलाइन)</h3>` + fb.map(c =>
     `<div class="glass card"><b>${esc(c.title || "Competition")}</b><br><small style="color:var(--mut)">${esc(c.desc || "")}</small>
-    <button class="btn gold" style="margin-top:8px" onclick="startCompBattle('${esc(c.id)}')">▶️ Join</button></div>`).join("");
-  html += `<h3 class="sec-title">⚔️ Battle Types</h3>` + COMP_TYPES.map(t =>
+    <button class="btn gold" style="margin-top:8px" onclick="startCompBattle('${esc(c.id)}')">▶️ जुड़ें</button></div>`).join("");
+  html += `<h3 class="sec-title">⚔️ मुकाबले के प्रकार</h3>` + COMP_TYPES.map(t =>
     `<div class="glass card"><b>${t.name}</b><br><small style="color:var(--mut)">${t.desc}</small>
-    <button class="btn gold" style="margin-top:8px" onclick="startCompBattle('${t.id}')">▶️ Compete Karo</button></div>`).join("");
-  html += `<div class="glass card"><small style="color:var(--mut)">🏆 Result ke baad automatic ranking. Live Battle (fixed time, sab saath) jald aa raha hai.</small></div>`;
+    <button class="btn gold" style="margin-top:8px" onclick="startCompBattle('${t.id}')">▶️ प्रतिस्पर्धा करें</button></div>`).join("");
+  html += `<div class="glass card"><small style="color:var(--mut)">🏆 परिणाम के बाद स्वतः रैंकिंग। लाइव बैटल (निश्चित समय, सभी एक साथ) जल्द आ रहा है।</small></div>`;
   $("compBody").innerHTML = html;
 }
 window.startCompBattle = function (id) {
   const t = COMP_TYPES.find(x => x.id === id) || COMP_TYPES[0];
   // time-windowed mock vs bots
   const qs = shuffle(QB).slice(0, t.count);
-  if (!qs.length) { toast("Questions nahi mile"); return; }
+  if (!qs.length) { toast("प्रश्न नहीं मिले"); return; }
   const saveMS = MS.type; MS.type = "full";
   const b = { qs, title: t.name, ex: { total: qs.length, mins: t.mins, marks: 1, neg: 0.25, sections: {} } };
   MK = {
@@ -818,25 +823,25 @@ function renderPerf() {
   const wt = weakTopics(5);
   $("perfBody").innerHTML = `
     <div class="stat-grid">
-      <div class="stat"><div class="v">${tests}</div><small>Tests Attempted</small></div>
-      <div class="stat"><div class="v">${qs}</div><small>Questions Solved</small></div>
-      <div class="stat"><div class="v">${acc}%</div><small>Avg Accuracy</small></div>
-      <div class="stat"><div class="v">${avg}%</div><small>Avg Score</small></div>
-      <div class="stat"><div class="v">#${best}</div><small>Current Rank</small></div>
-      <div class="stat"><div class="v">🔥${getStreak()}</div><small>Day Streak</small></div>
+      <div class="stat"><div class="v">${tests}</div><small>दिए गए टेस्ट</small></div>
+      <div class="stat"><div class="v">${qs}</div><small>हल किए गए प्रश्न</small></div>
+      <div class="stat"><div class="v">${acc}%</div><small>औसत एक्यूरेसी</small></div>
+      <div class="stat"><div class="v">${avg}%</div><small>औसत स्कोर</small></div>
+      <div class="stat"><div class="v">#${best}</div><small>वर्तमान रैंक</small></div>
+      <div class="stat"><div class="v">🔥${getStreak()}</div><small>दिन की स्ट्रीक</small></div>
     </div>
-    <h3 class="sec-title">📊 Subject Performance</h3>
+    <h3 class="sec-title">📊 विषय प्रदर्शन</h3>
     ${Object.keys(sub).length ? Object.keys(sub).map(s => {
       const a = Math.round(sub[s].ok / sub[s].att * 100);
       return `<div class="bar-row"><div class="bl"><span>${SUBJECTS[s] ? SUBJECTS[s].icon + " " + SUBJECTS[s].name : s}</span><span>${a}%</span></div>
         <div class="bar"><div class="${a < 60 ? "low" : ""}" style="width:${a}%"></div></div></div>`;
-    }).join("") : "<p style='color:var(--mut)'>Abhi koi test nahi diya.</p>"}
-    <h3 class="sec-title">⚠️ Weak Topics</h3>
-    ${wt.length ? wt.map(t => `<div class="lb-row"><div class="lb-info"><b>⚠️ ${esc(t.topic)}</b><small>${SUBJECTS[t.subject] ? SUBJECTS[t.subject].name : t.subject} • ${t.acc}% accuracy (${t.att} attempted)</small></div></div>`).join("") +
-      `<button class="btn gold" onclick="startPractice({mode:'weak',count:25,title:'Weak Topics Practice'})">▶️ Practice Weak Topics</button>`
-      : "<p style='color:var(--mut)'>Koi weak topic nahi — badhiya! 🎉</p>"}
-    <h3 class="sec-title">🕘 Test History</h3>
-    ${h.slice(0, 15).map(x => `<div class="lb-row"><div class="lb-info"><b>${esc(x.title || x.kind)}</b><small>${new Date(x.ts).toLocaleDateString("hi-IN")} • ${x.correct}/${x.total} • ${x.acc}%</small></div><div class="lb-xp">+${(x.correct || 0) * 10} XP</div></div>`).join("") || "<p style='color:var(--mut)'>History khaali hai.</p>"}`;
+    }).join("") : "<p style='color:var(--mut)'>अभी कोई टेस्ट नहीं दिया।</p>"}
+    <h3 class="sec-title">⚠️ कमज़ोर टॉपिक</h3>
+    ${wt.length ? wt.map(t => `<div class="lb-row"><div class="lb-info"><b>⚠️ ${esc(t.topic)}</b><small>${SUBJECTS[t.subject] ? SUBJECTS[t.subject].name : t.subject} • ${t.acc}% एक्यूरेसी (${t.att} प्रयास)</small></div></div>`).join("") +
+      `<button class="btn gold" onclick="startPractice({mode:'weak',count:25,title:'कमज़ोर टॉपिक अभ्यास'})">▶️ कमज़ोर टॉपिक अभ्यास</button>`
+      : "<p style='color:var(--mut)'>कोई कमज़ोर टॉपिक नहीं — बहुत बढ़िया! 🎉</p>"}
+    <h3 class="sec-title">🕘 टेस्ट हिस्ट्री</h3>
+    ${h.slice(0, 15).map(x => `<div class="lb-row"><div class="lb-info"><b>${esc(x.title || x.kind)}</b><small>${new Date(x.ts).toLocaleDateString("hi-IN")} • ${x.correct}/${x.total} • ${x.acc}%</small></div><div class="lb-xp">+${(x.correct || 0) * 10} XP</div></div>`).join("") || "<p style='color:var(--mut)'>हिस्ट्री खाली है।</p>"}`;
 }
 
 // ============================================================
@@ -860,13 +865,13 @@ function renderCA() {
   $("caList").innerHTML =
     list.map((a, i) => `<div class="glass card"><small style="color:var(--gold2)">${esc(a.cat)}</small><b style="display:block;margin:6px 0">${esc(a.title)}</b>
       <p style="color:var(--mut);font-size:14px">${esc(a.body)}</p>
-      <button class="btn sm gold" onclick="caQuiz(${i})">📝 Take Quiz — 5 Questions</button></div>`).join("") +
-    (caQs.length ? `<div class="glass card"><b>📰 CA Question Bank</b><br><small style="color:var(--mut)">${caQs.length} questions</small>
-      <button class="btn gold" style="margin-top:8px" onclick="startPractice({subject:'ca',topic:'all',count:10,mode:'practice',title:'CA Practice'})">▶️ Practice</button></div>` : "");
+      <button class="btn sm gold" onclick="caQuiz(${i})">📝 क्विज़ दें — 5 प्रश्न</button></div>`).join("") +
+    (caQs.length ? `<div class="glass card"><b>📰 CA Question Bank</b><br><small style="color:var(--mut)">${caQs.length} प्रश्न</small>
+      <button class="btn gold" style="margin-top:8px" onclick="startPractice({subject:'ca',topic:'all',count:10,mode:'practice',title:'CA अभ्यास'})">▶️ अभ्यास करें</button></div>` : "");
 }
 window.caQuiz = function (i) {
   const qs = seededPick(QB.filter(q => q.subject === "ca").concat(QB), "ca" + i + todayKey(), 5);
-  if (!qs.length) { toast("Quiz questions nahi mile"); return; }
+  if (!qs.length) { toast("क्विज़ के प्रश्न नहीं मिले"); return; }
   startPractice({ mode: "practice", count: 5, title: "CA Quiz" });
   // override picked set
   PR.qs = qs; PR.ans = new Array(qs.length).fill(-1); PR.ok = new Array(qs.length).fill(null); renderPR();
@@ -884,22 +889,22 @@ function renderPYQScreen() {
   $$("#pyqYears .chip").forEach(c => c.onclick = () => { PYQ.year = c.dataset.y; renderPYQScreen(); });
   $("pyqSubs").innerHTML = Object.keys(SUBJECTS).map(s => `<button class="chip ${PYQ.sub === s ? "on" : ""}" data-s="${s}">${SUBJECTS[s].icon}</button>`).join("");
   $$("#pyqSubs .chip").forEach(c => c.onclick = () => { PYQ.sub = c.dataset.s; renderPYQScreen(); });
-  const n = QB.filter(q => (!q.exam || q.exam.indexOf(PYQ.exam) >= 0) && q.subject === PYQ.sub).length;
-  $("pyqInfo").innerHTML = `<b>${esc(EXAMS[PYQ.exam].name)} ${PYQ.year}</b> — ${SUBJECTS[PYQ.sub].name}<br><small style="color:var(--mut)">${n} questions available</small>`;
+  const n = QB.filter(q => (!q.exams || q.exams.indexOf(PYQ.exam) >= 0) && q.subject === PYQ.sub).length;
+  $("pyqInfo").innerHTML = `<b>${esc(EXAMS[PYQ.exam].name)} ${PYQ.year}</b> — ${SUBJECTS[PYQ.sub].name}<br><small style="color:var(--mut)">${n} प्रश्न उपलब्ध</small>`;
 }
 function pyqGo(mockMode) {
-  let qs = QB.filter(q => (!q.exam || q.exam.indexOf(PYQ.exam) >= 0) && q.subject === PYQ.sub);
+  let qs = QB.filter(q => (!q.exams || q.exams.indexOf(PYQ.exam) >= 0) && q.subject === PYQ.sub);
   if (!qs.length) qs = QB.filter(q => q.subject === PYQ.sub);
   if (!qs.length) qs = QB.slice();
   if (mockMode) {
     const ex = EXAMS[PYQ.exam];
-    MK = { qs: qs.slice(0, ex.total), ex, title: "📄 " + ex.name + " " + PYQ.year + " PYQ", i: 0, ans: new Array(Math.min(qs.length, ex.total)).fill(-1), mark: [], seen: [], t0: Date.now(), left: ex.mins * 60, timerId: null, qTime: [], qT0: Date.now() };
+    MK = { qs: qs.slice(0, ex.total), ex, title: "📄 " + ex.name + " " + PYQ.year + " पैटर्न", i: 0, ans: new Array(Math.min(qs.length, ex.total)).fill(-1), mark: [], seen: [], t0: Date.now(), left: ex.mins * 60, timerId: null, qTime: [], qT0: Date.now() };
     MK.mark = new Array(MK.qs.length).fill(false); MK.seen = new Array(MK.qs.length).fill(false); MK.seen[0] = true; MK.qTime = new Array(MK.qs.length).fill(0);
     $("mkTitle").textContent = MK.title;
     MK.timerId = setInterval(() => { MK.left--; const m = Math.floor(MK.left / 60), s = MK.left % 60; $("mkTimer").textContent = m + ":" + String(s).padStart(2, "0"); if (MK.left <= 0) submitMock(true); }, 1000);
     showScreen("scr-mock"); renderMK(); renderPalette();
   } else {
-    startPractice({ subject: PYQ.sub, topic: "all", count: Math.min(qs.length, 50), mode: "practice", title: "PYQ " + PYQ.year + " Practice" });
+    startPractice({ subject: PYQ.sub, topic: "all", count: Math.min(qs.length, 50), mode: "practice", title: "पैटर्न " + PYQ.year + " अभ्यास" });
   }
 }
 
@@ -909,8 +914,8 @@ function pyqGo(mockMode) {
 function isBookmarked(qid) { return store.get("bm", []).indexOf(qid) >= 0; }
 function toggleBookmark(qid) {
   let b = store.get("bm", []);
-  if (b.indexOf(qid) >= 0) { b = b.filter(x => x !== qid); toast("🔖 Removed"); }
-  else { b.push(qid); toast("🔖 Saved!"); }
+  if (b.indexOf(qid) >= 0) { b = b.filter(x => x !== qid); toast("🔖 हटाया गया"); }
+  else { b.push(qid); toast("🔖 सेव हो गया!"); }
   store.set("bm", b);
 }
 function renderBookmarks() {
@@ -918,10 +923,10 @@ function renderBookmarks() {
   const qs = b.map(id => QB.find(q => q.id === id)).filter(Boolean);
   $("bmBody").innerHTML = qs.length ? qs.map(q =>
     `<div class="glass card rev-q"><div class="rq"><b>${esc(q.topic)}</b> — ${esc(q.q)}</div>
-     <div style="font-size:13px;color:var(--green)">Sahi: ${esc(q.opts[q.ans])}</div>
+     <div style="font-size:13px;color:var(--green)">सही: ${esc(q.opts[q.ans])}</div>
      <div class="qacts"><button class="btn sm ghost" onclick="aiExplainById('${q.id}')">🤖 Explain</button>
-     <button class="btn sm ghost" onclick="toggleBookmark('${q.id}');renderBookmarks()">🗑️ Remove</button></div></div>`
-  ).join("") : "<p style='color:var(--mut);text-align:center;margin-top:40px'>🔖<br>Koi bookmark nahi.<br>Question par 📑 dabakar save karo.</p>";
+     <button class="btn sm ghost" onclick="toggleBookmark('${q.id}');renderBookmarks()">🗑️ हटाएँ</button></div></div>`
+  ).join("") : "<p style='color:var(--mut);text-align:center;margin-top:40px'>🔖<br>कोई बुकमार्क नहीं।<br>प्रश्न पर 📑 दबाकर सेव करें।</p>";
 }
 window.aiExplainById = function (id) { const q = QB.find(x => x.id === id); if (q) aiExplain(q); };
 
@@ -946,35 +951,35 @@ function renderProfile() {
     <div class="glass card gold-border" style="text-align:center">
       <div style="font-size:52px">👤</div>
       <h2>${esc(p.name || p.username || "Student")}</h2>
-      <p style="color:var(--mut)">${ex ? "🎯 " + esc(ex.name) : ""} • #${r.rank} Rank • ${getXP()} XP</p>
+      <p style="color:var(--mut)">${ex ? "🎯 " + esc(ex.name) : ""} • #${r.rank} रैंक • ${getXP()} XP</p>
       <div class="streak">🔥 ${getStreak()} day streak</div>
-      <button class="btn ghost sm" style="margin-top:10px" id="pfEdit">✏️ Naam / Target badlo</button>
+      <button class="btn ghost sm" style="margin-top:10px" id="pfEdit">✏️ नाम / लक्ष्य बदलें</button>
     </div>
-    <div class="set-row"><span>🌐 Language</span><button class="chip ${p.lang === "hi" ? "on" : ""}" id="langTgl">${p.lang === "hi" ? "हिंदी" : "English"}</button></div>
-    <div class="set-row"><span>🔔 Notifications</span><button class="switch ${p.notif ? "on" : ""}" id="notifTgl"></button></div>
-    <div class="set-row"><span>🔒 Privacy (real naam chhupao)</span><button class="switch ${p.priv ? "on" : ""}" id="privTgl"></button></div>
-    <button class="btn ghost" data-go="scr-performance">📈 Performance</button>
-    <button class="btn ghost" data-go="scr-bookmarks">🔖 My Bookmarks</button>
-    <button class="btn ghost" data-go="scr-achievements">🏅 Achievements</button>
-    <button class="btn ghost" data-go="scr-search">🔍 Search</button>
+    <div class="set-row"><span>🌐 भाषा</span><button class="chip ${p.lang === "hi" ? "on" : ""}" id="langTgl">${p.lang === "hi" ? "हिंदी" : "English"}</button></div>
+    <div class="set-row"><span>🔔 नोटिफिकेशन</span><button class="switch ${p.notif ? "on" : ""}" id="notifTgl"></button></div>
+    <div class="set-row"><span>🔒 प्राइवेसी मोड</span><button class="switch ${p.priv ? "on" : ""}" id="privTgl"></button></div>
+    <button class="btn ghost" data-go="scr-performance">📈 प्रदर्शन</button>
+    <button class="btn ghost" data-go="scr-bookmarks">🔖 मेरे बुकमार्क</button>
+    <button class="btn ghost" data-go="scr-achievements">🏅 उपलब्धियाँ</button>
+    <button class="btn ghost" data-go="scr-search">🔍 खोजें</button>
     <button class="btn gold" id="btnUpdCheck">🔄 अपडेट चेक करें</button>
     <div class="glass card" style="text-align:center">
-      <b>💬 Feedback / Contact</b><br>
+      <b>💬 फ़ीडबैक / संपर्क</b><br>
       <small style="color:var(--mut)">khanmdhasnain378@gmail.com<br>
       <a href="https://ig.me/m/ruhvibes1" style="color:var(--gold2)">Instagram: @ruhvibes1</a></small>
       <div class="foot-note">Made with ♥ by Hasnain<br>RuhRank 1.0</div>
     </div>`;
   $("pfEdit").onclick = () => {
-    openGen("✏️ Profile", `
-      <label style="font-size:13px;color:var(--mut)">Naam</label>
-      <input id="fName" class="searchbox" value="${esc(p.name || "")}" placeholder="Tumhara naam">
-      <label style="font-size:13px;color:var(--mut)">Username</label>
-      <input id="fUser" class="searchbox" value="${esc(p.username || "")}" placeholder="username">
-      <button class="btn gold" id="fSave">Save</button>`);
+    openGen("✏️ प्रोफ़ाइल", `
+      <label style="font-size:13px;color:var(--mut)">नाम</label>
+      <input id="fName" class="searchbox" value="${esc(p.name || "")}" placeholder="आपका नाम">
+      <label style="font-size:13px;color:var(--mut)">यूज़रनेम</label>
+      <input id="fUser" class="searchbox" value="${esc(p.username || "")}" placeholder="यूज़रनेम">
+      <button class="btn gold" id="fSave">सेव करें</button>`);
     $("fSave").onclick = () => {
       const pp = U.profile;
       pp.name = $("fName").value.trim(); pp.username = $("fUser").value.trim() || "student" + Math.floor(Math.random() * 9999);
-      U.profile = pp; $("genModal").classList.add("hidden"); renderProfile(); toast("✅ Saved!");
+      U.profile = pp; $("genModal").classList.add("hidden"); renderProfile(); toast("✅ सेव हो गया!");
     };
   };
   $("langTgl").onclick = () => { const pp = U.profile; pp.lang = pp.lang === "hi" ? "en" : "hi"; U.profile = pp; renderProfile(); };
@@ -993,15 +998,15 @@ function renderSearch() {
     if (!s) { $("searchRes").innerHTML = ""; return; }
     let html = "";
     const exHit = Object.keys(EXAMS).filter(id => EXAMS[id].name.toLowerCase().includes(s));
-    if (exHit.length) html += `<h3 class="sec-title">Exams</h3>` + exHit.map(id => `<div class="lb-row"><div class="lb-info"><b>${EXAMS[id].icon} ${esc(EXAMS[id].name)}</b><small>${EXAMS[id].total}Q • ${EXAMS[id].mins}min</small></div></div>`).join("");
+    if (exHit.length) html += `<h3 class="sec-title">Exams</h3>` + exHit.map(id => `<div class="lb-row"><div class="lb-info"><b>${EXAMS[id].icon} ${esc(EXAMS[id].name)}</b><small>${EXAMS[id].total} प्रश्न • ${EXAMS[id].mins} मिनट</small></div></div>`).join("");
     const qHit = QB.filter(q => q.q.toLowerCase().includes(s) || (q.topic || "").toLowerCase().includes(s)).slice(0, 15);
     if (qHit.length) html += `<h3 class="sec-title">Questions (${qHit.length})</h3>` + qHit.map(q =>
-      `<div class="glass card rev-q"><div class="rq">${esc(q.q)}</div><div style="font-size:13px;color:var(--green)">Sahi: ${esc(q.opts[q.ans])}</div>
+      `<div class="glass card rev-q"><div class="rq">${esc(q.q)}</div><div style="font-size:13px;color:var(--green)">सही: ${esc(q.opts[q.ans])}</div>
        <div class="qacts"><button class="btn sm ghost" onclick="aiExplainById('${q.id}')">🤖 Explain</button>
-       <button class="btn sm ghost" onclick="toggleBookmark('${q.id}')">🔖 Save</button></div></div>`).join("");
+       <button class="btn sm ghost" onclick="toggleBookmark('${q.id}')">🔖 सेव करें</button></div></div>`).join("");
     const tHit = Array.from(new Set(QB.map(q => q.topic))).filter(t => t.toLowerCase().includes(s)).slice(0, 10);
     if (tHit.length) html += `<h3 class="sec-title">Topics</h3><div class="chip-row">` + tHit.map(t => `<button class="chip" onclick="startPractice({topic:'${esc(t)}',subject:'all',count:10,mode:'practice',title:'${esc(t)}'})">${esc(t)}</button>`).join("") + `</div>`;
-    $("searchRes").innerHTML = html || "<p style='color:var(--mut)'>Kuch nahi mila.</p>";
+    $("searchRes").innerHTML = html || "<p style='color:var(--mut)'>कुछ नहीं मिला।</p>";
   };
   box.oninput = doSearch;
 }
@@ -1020,7 +1025,7 @@ function renderNotifs() {
   $("notifBody").innerHTML = all.length ? all.map(n =>
     `<div class="notif"><b>${esc(n.title)}${n.fb ? ' <small style="color:var(--green)">🌐</small>' : ""}</b><br>
      <small>${esc(n.body || "")}</small><br><small style="color:var(--mut)">${new Date(n.ts).toLocaleString("hi-IN")}</small></div>`
-  ).join("") : "<p style='color:var(--mut);text-align:center;margin-top:40px'>🔔<br>Koi notification nahi.</p>";
+  ).join("") : "<p style='color:var(--mut);text-align:center;margin-top:40px'>🔔<br>कोई नोटिफिकेशन नहीं।</p>";
 }
 
 // ============================================================
@@ -1032,10 +1037,10 @@ function wire() {
   $("btnLaterUpdate").onclick = () => $("updateDialog").classList.add("hidden");
   $("aiClose").onclick = () => $("aiModal").classList.add("hidden");
   $("genClose").onclick = () => $("genModal").classList.add("hidden");
-  $("btnStartPractice").onclick = () => startPractice({ subject: PS.subject, topic: PS.topic, count: PS.count, mode: PS.mode, title: "Practice" });
+  $("btnStartPractice").onclick = () => startPractice({ subject: PS.subject, topic: PS.topic, count: PS.count, mode: PS.mode, title: "अभ्यास" });
   $("prPrev").onclick = () => { if (PR && PR.i > 0) { PR.i--; renderPR(); } };
   $("prNext").onclick = () => { if (PR) { if (PR.i < PR.qs.length - 1) { PR.i++; renderPR(); } else finishPractice(); } };
-  $("prFinish").onclick = () => { if (PR && confirm("Practice khatm karein?")) finishPractice(); };
+  $("prFinish").onclick = () => { if (PR && confirm("अभ्यास समाप्त करें?")) finishPractice(); };
   $("btnStartMock").onclick = startMock;
   $("mkPrev").onclick = () => mkNav(-1);
   $("mkNext").onclick = () => mkNav(1);
@@ -1044,9 +1049,9 @@ function wire() {
   $("mkSubmit").onclick = () => {
     if (!MK) return;
     const un = MK.ans.filter(a => a < 0).length;
-    openGen("✅ Submit Test?", `<p style="color:var(--mut)">Answered: ${MK.qs.length - un}/${MK.qs.length} • Unanswered: ${un}</p>
-      <button class="btn gold" id="cfYes">Haan, Submit Karo</button>
-      <button class="btn ghost" onclick="document.getElementById('genModal').classList.add('hidden')">Abhi nahi</button>`);
+    openGen("✅ टेस्ट सबमिट करें?", `<p style="color:var(--mut)">उत्तर दिए: ${MK.qs.length - un}/${MK.qs.length} • अनुत्तरित: ${un}</p>
+      <button class="btn gold" id="cfYes">हाँ, सबमिट करें</button>
+      <button class="btn ghost" onclick="document.getElementById('genModal').classList.add('hidden')">अभी नहीं</button>`);
     $("cfYes").onclick = () => { $("genModal").classList.add("hidden"); submitMock(false); };
   };
   $("pyqPractice").onclick = () => pyqGo(false);
@@ -1054,8 +1059,8 @@ function wire() {
   // seed welcome notifs
   if (!store.get("seeded", false)) {
     store.set("seeded", true);
-    notify("🎉 RuhRank me swagat hai!", "Apna target exam select karo aur practice shuru karo.");
-    notify("🔥 Daily Challenge live hai!", "Roz 10 questions, 5 minute — streak banao!");
+    notify("🎉 RuhRank में स्वागत है!", "अपना लक्ष्य परीक्षा चुनें और अभ्यास शुरू करें।");
+    notify("🔥 दैनिक चुनौती लाइव है!", "रोज़ 10 प्रश्न, 5 मिनट — स्ट्रीक बनाएँ!");
   }
 }
 function boot() {

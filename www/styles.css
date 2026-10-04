@@ -190,3 +190,169 @@ body{
 .score-big{font-size:52px;font-weight:800;color:var(--gold);text-align:center}
 .score-sub{text-align:center;color:var(--mut);margin-bottom:12px}
 .rev-q{margin-bottom:12px}.rev-q .rq{font-size:14px;margin-bottom:6px}
+
+/* ============================================================
+   PREMIUM POLISH — RuhRank 1.0 (gold/navy luxury layer)
+   ============================================================ */
+body{
+  background:
+    radial-gradient(900px 480px at 85% -5%, rgba(245,179,1,.10) 0%, transparent 60%),
+    radial-gradient(1200px 600px at 80% -10%, #1b2456 0%, var(--navy) 55%) fixed;
+}
+#app{background:rgba(0,0,0,.22)}
+
+/* topbar — premium gradient */
+.topbar{
+  background:linear-gradient(180deg, rgba(19,26,69,.96), rgba(11,16,48,.88));
+  border-bottom:1px solid rgba(245,179,1,.35);
+  box-shadow:0 4px 20px rgba(0,0,0,.35);
+}
+.brand b{
+  background:linear-gradient(100deg,#ffe9a8 0%,var(--gold) 40%,var(--gold2) 70%,#e09b00 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* buttons — rich gold */
+.btn{transition:transform .12s ease, box-shadow .2s ease, filter .2s ease}
+.btn:active{transform:scale(.97)}
+.btn.gold{
+  background:linear-gradient(135deg,#ffe08a 0%,var(--gold) 35%,#e09b00 100%);
+  box-shadow:0 6px 20px rgba(245,179,1,.4), inset 0 1px 0 rgba(255,255,255,.5);
+  text-shadow:0 1px 0 rgba(255,255,255,.25);
+}
+.btn.gold:active{box-shadow:0 2px 8px rgba(245,179,1,.35), inset 0 1px 0 rgba(255,255,255,.5)}
+.btn:not(.gold):not(.ghost):active{background:rgba(255,255,255,.16)}
+
+/* cards — luxury depth */
+.glass{
+  border:1px solid rgba(245,179,1,.14);
+  box-shadow:0 10px 28px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
+  background:linear-gradient(165deg, rgba(255,255,255,.075), rgba(255,255,255,.03));
+}
+.gold-border{
+  box-shadow:0 0 22px rgba(245,179,1,.16), 0 10px 28px rgba(0,0,0,.35);
+}
+.sec-title{
+  font-weight:700;letter-spacing:.3px;
+  background:linear-gradient(90deg,var(--gold2),#e8a90c);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* exam cards */
+.exam{transition:transform .15s ease, box-shadow .2s ease, border-color .2s ease}
+.exam:active{transform:scale(.94)}
+.exam.sel{
+  border-color:var(--gold);
+  box-shadow:0 0 18px rgba(245,179,1,.4), inset 0 0 12px rgba(245,179,1,.08);
+  background:linear-gradient(165deg, rgba(245,179,1,.14), rgba(255,255,255,.03));
+}
+
+/* chips & tabs */
+.chip{transition:all .15s ease}
+.chip.on{box-shadow:0 4px 14px rgba(245,179,1,.35)}
+.tab.on{box-shadow:0 4px 14px rgba(245,179,1,.3)}
+
+/* onboarding hero */
+.ob-hero h1{
+  background:linear-gradient(100deg,#fff3c4 0%,var(--gold) 45%,var(--gold2) 75%,#d99400 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 4px 16px rgba(245,179,1,.35));
+}
+.logo-trophy{animation:floaty 3.2s ease-in-out infinite}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+/* question UI */
+.qtext{font-size:17.5px}
+.opt{transition:border-color .15s ease, background .15s ease, transform .1s ease}
+.opt:active{transform:scale(.99)}
+.opt.sel{
+  border-color:var(--gold);
+  background:linear-gradient(135deg, rgba(245,179,1,.16), rgba(245,179,1,.06));
+  box-shadow:0 0 12px rgba(245,179,1,.2);
+}
+.opt.sel .k{background:var(--gold);color:#231a00}
+.opt.right{box-shadow:0 0 12px rgba(46,204,113,.25)}
+.opt.wrong{box-shadow:0 0 12px rgba(255,91,91,.25)}
+.qtopic{border:1px solid rgba(245,179,1,.3)}
+
+/* mock — hero screen */
+.mockbar{
+  background:linear-gradient(180deg, rgba(19,26,69,.97), rgba(11,16,48,.92));
+  box-shadow:0 4px 18px rgba(0,0,0,.4);
+}
+.mock-timer{text-shadow:0 0 14px rgba(245,179,1,.5)}
+.pal{transition:transform .12s ease, box-shadow .15s ease}
+.pal:active{transform:scale(.92)}
+.pal.ans{box-shadow:0 0 10px rgba(46,204,113,.45)}
+.pal.mark{box-shadow:0 0 10px rgba(165,91,255,.45)}
+.pal.skip{box-shadow:0 0 10px rgba(255,91,91,.4)}
+
+/* result — hero screen */
+.score-big{
+  background:linear-gradient(100deg,#fff3c4,var(--gold) 50%,var(--gold2));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 4px 14px rgba(245,179,1,.4));
+}
+.stat{transition:transform .15s ease}
+.stat:active{transform:scale(.96)}
+.stat .v{
+  background:linear-gradient(100deg,var(--gold2),var(--gold));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* leaderboard */
+.lb-row.me{
+  border-color:var(--gold);
+  box-shadow:0 0 16px rgba(245,179,1,.25);
+  background:linear-gradient(165deg, rgba(245,179,1,.1), rgba(255,255,255,.03));
+}
+.lb-pos{
+  background:linear-gradient(100deg,var(--gold2),var(--gold));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* bottom nav — gold glow active */
+#bottomNav{
+  background:linear-gradient(180deg, rgba(19,26,69,.97), rgba(8,12,36,.98));
+  border-top:1px solid rgba(245,179,1,.35);
+  box-shadow:0 -6px 24px rgba(0,0,0,.45);
+}
+#bottomNav button{transition:color .15s ease, transform .12s ease;position:relative}
+#bottomNav button:active{transform:scale(.92)}
+#bottomNav button.on{
+  color:var(--gold);
+  text-shadow:0 0 12px rgba(245,179,1,.6);
+}
+#bottomNav button.on::before{
+  content:'';position:absolute;top:-9px;left:25%;right:25%;height:3px;border-radius:99px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  box-shadow:0 0 10px rgba(245,179,1,.8);
+}
+
+/* overlays */
+.ov-card{
+  box-shadow:0 24px 60px rgba(0,0,0,.6), 0 0 30px rgba(245,179,1,.12);
+}
+.icon-btn{transition:transform .12s ease}
+.icon-btn:active{transform:scale(.9)}
+
+/* achievements */
+.ach.got{
+  box-shadow:0 0 16px rgba(245,179,1,.2);
+  background:linear-gradient(165deg, rgba(245,179,1,.1), rgba(255,255,255,.03));
+}
+
+/* screen transition */
+.screen.on{animation:fadeUp .25s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* scrollbar */
+.scroll::-webkit-scrollbar{width:5px}
+.scroll::-webkit-scrollbar-thumb{background:rgba(245,179,1,.3);border-radius:99px}
+
+/* onboarding trust strip */
+.ob-stats{display:flex;gap:10px;justify-content:center;margin-top:18px}
+.ob-stat{background:rgba(255,255,255,.05);border:1px solid rgba(245,179,1,.25);border-radius:14px;
+  padding:10px 16px;text-align:center;min-width:72px}
+.ob-stat b{display:block;font-size:19px;color:var(--gold)}
+.ob-stat small{color:var(--mut);font-size:11px}

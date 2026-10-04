@@ -22,10 +22,10 @@
 <div id="offlineOverlay" class="overlay hidden">
   <div class="ov-card">
     <div class="ov-icon">📡</div>
-    <h2>Internet nahi hai</h2>
-    <p>Practice aur saved questions offline chalenge.<br>Leaderboard, Competition aur naye updates ke liye internet chahiye.</p>
-    <button class="btn gold" id="btnRetryNet">🔄 Retry</button>
-    <button class="btn ghost" id="btnOfflineGo">Offline Practice जारी रखें</button>
+    <h2>इंटरनेट नहीं है</h2>
+    <p>अभ्यास और सेव किए गए प्रश्न ऑफ़लाइन चलेंगे।<br>लीडरबोर्ड, प्रतियोगिता और नए अपडेट के लिए इंटरनेट आवश्यक है।</p>
+    <button class="btn gold" id="btnRetryNet">🔄 पुनः प्रयास करें</button>
+    <button class="btn ghost" id="btnOfflineGo">ऑफ़लाइन अभ्यास जारी रखें</button>
   </div>
 </div>
 
@@ -33,10 +33,10 @@
 <div id="updateDialog" class="overlay hidden">
   <div class="ov-card">
     <div class="ov-icon">🚀</div>
-    <h2>Naya Update!</h2>
-    <p id="updateNotes">RuhRank ka naya version aa gaya hai.</p>
-    <button class="btn gold" id="btnDoUpdate">⬇️ Update Karo</button>
-    <button class="btn ghost" id="btnLaterUpdate">Baad me</button>
+    <h2>नया अपडेट!</h2>
+    <p id="updateNotes">RuhRank का नया वर्ज़न आ गया है।</p>
+    <button class="btn gold" id="btnDoUpdate">⬇️ अपडेट करें</button>
+    <button class="btn ghost" id="btnLaterUpdate">बाद में</button>
   </div>
 </div>
 
@@ -44,7 +44,7 @@
 <div id="aiModal" class="overlay hidden">
   <div class="ov-card wide">
     <div class="modal-head"><h2>🤖 AI Explanation</h2><button class="x" id="aiClose">✕</button></div>
-    <div id="aiBody" class="ai-body"><div class="spinner"></div><p>Samjhaya ja raha hai...</p></div>
+    <div id="aiBody" class="ai-body"><div class="spinner"></div><p>समझाया जा रहा है...</p></div>
   </div>
 </div>
 
@@ -64,9 +64,15 @@
       <div class="logo-trophy">🏆</div>
       <h1>RUHRANK</h1>
       <p class="tagline">Practice • Compete • Rank</p>
-      <p class="ob-sub">SSC, Railway, Banking, Bihar Police, BPSC, Defence — sab ek jagah</p>
+      <p class="ob-sub">SSC, Railway, Banking, Bihar Police, BPSC, Defence — सब एक जगह</p>
+      <div class="ob-stats">
+        <div class="ob-stat"><b>710</b><small>प्रश्न</small></div>
+        <div class="ob-stat"><b>17</b><small>परीक्षाएं</small></div>
+        <div class="ob-stat"><b>6</b><small>विषय</small></div>
+        <div class="ob-stat"><b>🤖</b><small>AI हेल्प</small></div>
+      </div>
     </div>
-    <h3 class="sec-title">🎯 Apna Target Exam chuno</h3>
+    <h3 class="sec-title">🎯 अपना लक्ष्य परीक्षा चुनें</h3>
     <div id="onboardExams" class="exam-grid"></div>
   </section>
 
@@ -88,7 +94,7 @@
         <div class="glass card mini" id="homeLiveCard"></div>
       </div>
       <div class="glass card" id="homeRankCard"></div>
-      <h3 class="sec-title">📚 Popular Exams</h3>
+      <h3 class="sec-title">📚 लोकप्रिय परीक्षाएँ</h3>
       <div id="homeExams" class="exam-grid"></div>
       <div class="foot-note">Made with ♥ by Hasnain</div>
     </div>
@@ -98,25 +104,25 @@
   <section class="screen" id="scr-practice-setup">
     <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">📝 <b>Practice</b></div><div></div></header>
     <div class="scroll">
-      <h3 class="sec-title">Subject chuno</h3>
+      <h3 class="sec-title">विषय चुनें</h3>
       <div id="psSubjects" class="chip-row"></div>
-      <h3 class="sec-title">Topic chuno</h3>
+      <h3 class="sec-title">टॉपिक चुनें</h3>
       <div id="psTopics" class="chip-row"></div>
-      <h3 class="sec-title">Questions</h3>
+      <h3 class="sec-title">प्रश्नों की संख्या</h3>
       <div class="chip-row" id="psCounts">
         <button class="chip on" data-n="10">10</button>
         <button class="chip" data-n="25">25</button>
         <button class="chip" data-n="50">50</button>
         <button class="chip" data-n="100">100</button>
       </div>
-      <h3 class="sec-title">Mode</h3>
+      <h3 class="sec-title">मोड</h3>
       <div class="mode-list" id="psModes">
-        <button class="mode on" data-m="practice"><b>📖 Practice</b><span>No pressure, instant explanation</span></button>
-        <button class="mode" data-m="timed"><b>⏱️ Timed</b><span>Timer ke saath practice</span></button>
-        <button class="mode" data-m="random"><b>🎲 Random</b><span>Database se random questions</span></button>
-        <button class="mode" data-m="weak"><b>⚠️ Weak Topics</b><span>Tumhare weak topics se auto questions</span></button>
+        <button class="mode on" data-m="practice"><b>📖 अभ्यास</b><span>बिना दबाव, तुरंत एक्सप्लेनेशन</span></button>
+        <button class="mode" data-m="timed"><b>⏱️ समयबद्ध</b><span>टाइमर के साथ अभ्यास</span></button>
+        <button class="mode" data-m="random"><b>🎲 रैंडम</b><span>प्रश्न बैंक से रैंडम प्रश्न</span></button>
+        <button class="mode" data-m="weak"><b>⚠️ कमज़ोर टॉपिक</b><span>आपके कमज़ोर टॉपिक से स्वतः प्रश्न</span></button>
       </div>
-      <button class="btn gold big" id="btnStartPractice">▶️ Start Practice</button>
+      <button class="btn gold big" id="btnStartPractice">▶️ अभ्यास शुरू करें</button>
     </div>
   </section>
 
@@ -136,10 +142,10 @@
         </div>
       </div>
       <div class="qnav">
-        <button class="btn ghost" id="prPrev">← Prev</button>
-        <button class="btn gold" id="prNext">Next →</button>
+        <button class="btn ghost" id="prPrev">← पिछला</button>
+        <button class="btn gold" id="prNext">अगला →</button>
       </div>
-      <button class="btn danger ghost" id="prFinish">⏹️ Finish Practice</button>
+      <button class="btn danger ghost" id="prFinish">⏹️ अभ्यास समाप्त करें</button>
     </div>
   </section>
 
@@ -147,14 +153,14 @@
   <section class="screen" id="scr-mock-setup">
     <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">🧪 <b>Tests</b></div><div></div></header>
     <div class="scroll">
-      <h3 class="sec-title">Test type chuno</h3>
+      <h3 class="sec-title">टेस्ट का प्रकार चुनें</h3>
       <div class="mode-list" id="msTypes">
-        <button class="mode on" data-t="full"><b>🧪 Full Mock</b><span>Real exam pattern — poora syllabus</span></button>
-        <button class="mode" data-t="pyq"><b>📄 Previous Year</b><span>PYQ paper, exam jaisa mahaul</span></button>
-        <button class="mode" data-t="smart"><b>🤖 Smart Test</b><span>Weak topics + unattempted se auto test</span></button>
+        <button class="mode on" data-t="full"><b>🧪 फुल मॉक</b><span>वास्तविक परीक्षा पैटर्न — पूरा सिलेबस</span></button>
+        <button class="mode" data-t="pyq"><b>📄 विगत वर्ष</b><span>PYQ पेपर — परीक्षा जैसा माहौल</span></button>
+        <button class="mode" data-t="smart"><b>🤖 स्मार्ट टेस्ट</b><span>कमज़ोर टॉपिक + अनअटेम्प्टेड से ऑटो टेस्ट</span></button>
       </div>
       <div class="glass card" id="msPattern"></div>
-      <button class="btn gold big" id="btnStartMock">▶️ Start Test</button>
+      <button class="btn gold big" id="btnStartMock">▶️ टेस्ट शुरू करें</button>
     </div>
   </section>
 
@@ -172,13 +178,13 @@
           <div id="mkOpts" class="opts"></div>
         </div>
         <div class="qnav">
-          <button class="btn ghost" id="mkPrev">← Prev</button>
-          <button class="btn ghost" id="mkClear">Clear</button>
-          <button class="btn gold" id="mkNext">Save & Next →</button>
+          <button class="btn ghost" id="mkPrev">← पिछला</button>
+          <button class="btn ghost" id="mkClear">साफ़ करें</button>
+          <button class="btn gold" id="mkNext">सेव व अगला →</button>
         </div>
         <div class="qnav">
-          <button class="btn warn" id="mkMark">🚩 Mark for Review</button>
-          <button class="btn danger" id="mkSubmit">✅ Submit Test</button>
+          <button class="btn warn" id="mkMark">🚩 रिव्यू हेतु चिह्नित करें</button>
+          <button class="btn danger" id="mkSubmit">✅ टेस्ट सबमिट करें</button>
         </div>
       </div>
       <div class="palette" id="mkPalette"></div>
@@ -202,7 +208,7 @@
     </div>
     <div class="scroll">
       <div class="glass card gold-border" id="lbMe"></div>
-      <label class="priv-row"><input type="checkbox" id="privToggle"> <span>Real naam dikhao (warna username)</span></label>
+      <label class="priv-row"><input type="checkbox" id="privToggle"> <span>प्रोफ़ाइल नाम दिखाएँ</span></label>
       <div id="lbList"></div>
     </div>
   </section>
@@ -238,12 +244,12 @@
   <section class="screen" id="scr-pyq">
     <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">📄 <b>Previous Year Papers</b></div><div></div></header>
     <div class="scroll">
-      <h3 class="sec-title">Exam</h3><div id="pyqExams" class="chip-row"></div>
-      <h3 class="sec-title">Year</h3><div id="pyqYears" class="chip-row"></div>
-      <h3 class="sec-title">Subject</h3><div id="pyqSubs" class="chip-row"></div>
+      <h3 class="sec-title">परीक्षा</h3><div id="pyqExams" class="chip-row"></div>
+      <h3 class="sec-title">वर्ष</h3><div id="pyqYears" class="chip-row"></div>
+      <h3 class="sec-title">विषय</h3><div id="pyqSubs" class="chip-row"></div>
       <div class="row2">
-        <button class="btn gold" id="pyqPractice">📖 Practice Mode</button>
-        <button class="btn ghost" id="pyqMock">🧪 Mock Mode</button>
+        <button class="btn gold" id="pyqPractice">📖 अभ्यास मोड</button>
+        <button class="btn ghost" id="pyqMock">🧪 मॉक मोड</button>
       </div>
       <div id="pyqInfo" class="glass card"></div>
     </div>
@@ -271,7 +277,7 @@
   <section class="screen" id="scr-search">
     <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">🔍 <b>Search</b></div><div></div></header>
     <div class="scroll">
-      <input id="searchBox" class="searchbox" placeholder="Search exams, questions, topics...">
+      <input id="searchBox" class="searchbox" placeholder="परीक्षा, प्रश्न, टॉपिक खोजें...">
       <div id="searchRes"></div>
     </div>
   </section>
