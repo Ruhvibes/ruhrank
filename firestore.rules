@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// ============================================================
+// RUHRANK FIRESTORE SECURITY RULES
+// ------------------------------------------------------------
+// HOW TO USE (Hasnain):
+//  1. Firebase console → Firestore Database → Rules tab
+//  2. Delete everything there, paste this whole file, click Publish.
+//  3. IMPORTANT: replace ADMIN_UID_PLACEHOLDER below with YOUR admin
+//     user's UID (Firebase console → Authentication → Users → copy UID
+//     of the admin email you created). Until you do that, NOBODY
+//     (not even you) can write questions/tests — the app will still
+//     READ fine, but admin writes will fail with "permission denied".
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helper: is the signed-in user the admin? ----
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == "ADMIN_UID_PLACEHOLDER";
+      // ^^^ Hasnain: replace ADMIN_UID_PLACEHOLDER with your admin UID ^^^
+    }
+
+    // ---- content collections: everyone reads, only admin writes ----
+    match /questions/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /tests/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /competitions/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /notifications/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---- users: each user reads/writes ONLY their own doc ----
+    // (name/xp are mirrored into /leaderboard for the public board)
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ---- leaderboard: public read; each user writes ONLY own entry ----
+    // entry shape: { name, xp, rank, updatedAt }
+    match /leaderboard/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name','xp','rank','updatedAt'])
+        && request.resource.data.xp is number;
+      allow delete: if isAdmin();
+    }
+
+    // ---- attempts (test results): user writes own, reads own ----
+    match /attempts/{doc} {
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---- bookmarks: private per user ----
+    match /bookmarks/{uid} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == uid;
+    }
+
+    // ---- everything else: locked ----
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RuhRank Admin Panel</title>
+<!--
+  ============================================================
+  RUHRANK ADMIN PANEL — for Hasnain (owner only)
+  ------------------------------------------------------------
+  HONEST SECURITY NOTE: The password gate below is CLIENT-SIDE
+  ONLY — anyone who views this page's source can see it. It is
+  just a casual lock on the door. The REAL security is enforced
+  by firestore.rules: only the Firebase Auth user whose UID you
+  put in the rules (ADMIN_UID_PLACEHOLDER) can WRITE anything.
+  Public users can only READ questions/tests/competitions.
+  Never rely on this page alone to protect your data.
+  ============================================================
+
+  FIREBASE CONFIG — Hasnain will inject real config.
+  Before this file's main script, add your own config like:
+    <script>
+      window.RR_FIREBASE_CONFIG = {
+        apiKey: "...", authDomain: "...", projectId: "...",
+        storageBucket: "...", messagingSenderId: "...", appId: "..."
+      };
+    </script>
+  (Copy it from Firebase console → Project settings → Your apps → Web app.)
+-->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --bg:#0d1117; --bg2:#131a24; --card:#161e2b; --line:#263043;
+  --txt:#e8edf5; --dim:#8b96a9; --gold:#f5b942; --gold2:#d99a22;
+  --green:#2fbf71; --red:#e5484d; --blue:#3e8ef7; --radius:12px;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+body{background:var(--bg); color:var(--txt); font-family:'Segoe UI',system-ui,Arial,sans-serif; min-height:100vh}
+a{color:var(--gold)}
+/* ---------- password gate ---------- */
+#gate{position:fixed; inset:0; background:rgba(6,9,14,.96); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px}
+.gate-box{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:36px 32px; width:100%; max-width:380px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.gate-box h1{font-size:26px; margin-bottom:6px}
+.gate-box h1 .t{color:var(--gold)}
+.gate-box p{color:var(--dim); font-size:13px; margin-bottom:20px}
+/* ---------- layout ---------- */
+header{background:var(--bg2); border-bottom:1px solid var(--line); padding:12px 20px; display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:50; flex-wrap:wrap}
+.logo{font-size:20px; font-weight:800}
+.logo .t{color:var(--gold)}
+nav{display:flex; gap:6px; flex-wrap:wrap}
+nav button{background:transparent; border:1px solid transparent; color:var(--dim); padding:8px 14px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600}
+nav button.active{background:var(--gold); color:#111; border-color:var(--gold)}
+nav button:hover:not(.active){border-color:var(--line); color:var(--txt)}
+.authbox{margin-left:auto; display:flex; align-items:center; gap:10px; font-size:13px}
+.badge{padding:4px 10px; border-radius:20px; font-size:12px; font-weight:700}
+.badge.on{background:rgba(47,191,113,.15); color:var(--green); border:1px solid var(--green)}
+.badge.off{background:rgba(229,72,77,.12); color:var(--red); border:1px solid var(--red)}
+main{max-width:1180px; margin:0 auto; padding:24px 20px 60px}
+.tab{display:none}
+.tab.active{display:block}
+h2{margin-bottom:16px; font-size:22px}
+h3{margin:22px 0 12px; font-size:17px; color:var(--gold)}
+/* ---------- cards / stats ---------- */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:8px}
+.stat{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:20px}
+.stat .n{font-size:32px; font-weight:800; color:var(--gold)}
+.stat .l{color:var(--dim); font-size:13px; margin-top:4px}
+/* ---------- forms ---------- */
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin-bottom:16px}
+label{display:block; font-size:13px; color:var(--dim); margin:12px 0 5px; font-weight:600}
+input[type=text],input[type=number],input[type=email],input[type=password],input[type=datetime-local],select,textarea{
+  width:100%; background:var(--bg); border:1px solid var(--line); color:var(--txt);
+  border-radius:8px; padding:10px 12px; font-size:14px; font-family:inherit}
+textarea{min-height:80px; resize:vertical}
+input:focus,select:focus,textarea:focus{outline:none; border-color:var(--gold)}
+.row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px}
+@media(max-width:700px){.row,.row3{grid-template-columns:1fr}}
+button.btn{background:var(--gold); color:#111; border:none; padding:10px 20px; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px; margin-top:14px}
+button.btn:hover{background:var(--gold2)}
+button.btn.ghost{background:transparent; color:var(--txt); border:1px solid var(--line)}
+button.btn.danger{background:var(--red); color:#fff}
+button.btn.small{padding:6px 12px; font-size:12px; margin:0 4px 0 0}
+button.btn:disabled{opacity:.45; cursor:not-allowed}
+.chk-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; margin-top:6px}
+.chk-grid label{display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:13px; color:var(--txt); margin:0; cursor:pointer; font-weight:400}
+.chk-grid label:has(input:checked){border-color:var(--gold); background:rgba(245,185,66,.08)}
+/* ---------- tables ---------- */
+table{width:100%; border-collapse:collapse; font-size:13px}
+th,td{text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top}
+th{color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.5px}
+tr:hover td{background:rgba(255,255,255,.02)}
+.q-text{max-width:420px}
+.pill{display:inline-block; background:rgba(62,142,247,.14); color:var(--blue); border:1px solid var(--blue); border-radius:12px; padding:2px 9px; font-size:11px; margin:1px 2px}
+.searchbar{margin-bottom:14px; max-width:420px}
+.notice{background:rgba(245,185,66,.08); border:1px solid var(--gold); border-radius:10px; padding:14px 16px; font-size:13px; margin-bottom:16px; line-height:1.6}
+.notice.err{background:rgba(229,72,77,.08); border-color:var(--red)}
+.muted{color:var(--dim); font-size:13px}
+.toolbar{display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap}
+.hidden{display:none!important}
+footer{text-align:center; color:var(--dim); font-size:12px; padding:24px}
+</style>
+</head>
+<body>
+
+<!-- ================= PASSWORD GATE ================= -->
+<div id="gate">
+  <div class="gate-box">
+    <h1>🏆 <span class="t">RuhRank</span> Admin</h1>
+    <p>Owner-only area. Enter panel password to continue.</p>
+    <input type="password" id="gatePass" placeholder="Panel password" style="margin-bottom:10px">
+    <button class="btn" style="width:100%" onclick="unlockGate()">Unlock Panel</button>
+    <p id="gateErr" class="muted" style="color:var(--red); margin-top:10px"></p>
+  </div>
+</div>
+
+<header>
+  <div class="logo">🏆 <span class="t">RuhRank</span> Admin</div>
+  <nav>
+    <button class="active" data-tab="dash" onclick="showTab('dash')">📊 Dashboard</button>
+    <button data-tab="qs" onclick="showTab('qs')">❓ Questions</button>
+    <button data-tab="tests" onclick="showTab('tests')">🧪 Tests</button>
+    <button data-tab="comp" onclick="showTab('comp')">⚔️ Competitions</button>
+    <button data-tab="notif" onclick="showTab('notif')">🔔 Notifications</button>
+  </nav>
+  <div class="authbox">
+    <span id="authBadge" class="badge off">Not signed in</span>
+    <button class="btn ghost small" id="authBtn" onclick="toggleAuth()">Sign in</button>
+  </div>
+</header>
+
+<main>
+  <!-- ================= DASHBOARD ================= -->
+  <section id="tab-dash" class="tab active">
+    <h2>📊 Dashboard</h2>
+    <div id="cfgWarn" class="notice err hidden">⚠️ Firebase config not found. Add <code>window.RR_FIREBASE_CONFIG</code> before the main script (see FIREBASE_SETUP.md step 2). Stats below will not load until then.</div>
+    <div class="stats">
+      <div class="stat"><div class="n" id="stUsers">–</div><div class="l">Total Users</div></div>
+      <div class="stat"><div class="n" id="stQs">–</div><div class="l">Questions in Bank</div></div>
+      <div class="stat"><div class="n" id="stTests">–</div><div class="l">Mock Tests</div></div>
+      <div class="stat"><div class="n" id="stAttempts">–</div><div class="l">Attempts Today</div></div>
+    </div>
+    <div class="card">
+      <h3>Quick actions</h3>
+      <button class="btn ghost small" onclick="showTab('qs')">＋ Add Question</button>
+      <button class="btn ghost small" onclick="showTab('tests')">＋ Build Test</button>
+      <button class="btn ghost small" onclick="showTab('notif')">＋ Send Notification</button>
+      <button class="btn ghost small" onclick="loadStats()">↻ Refresh stats</button>
+    </div>
+  </section>
+
+  <!-- ================= QUESTIONS ================= -->
+  <section id="tab-qs" class="tab">
+    <h2>❓ Questions Bank</h2>
+    <div class="toolbar">
+      <input type="text" id="qSearch" class="searchbar" style="margin:0" placeholder="🔍 Search question / subject / topic..." oninput="renderQList()">
+      <span class="muted" id="qCount"></span>
+    </div>
+    <div class="card">
+      <h3 id="qFormTitle">Add new question</h3>
+      <input type="hidden" id="qEditId">
+      <label>Exams (select all that apply)</label>
+      <div class="chk-grid" id="qExams"></div>
+      <div class="row">
+        <div><label>Subject</label>
+          <select id="qSubject">
+            <option value="gk">GK / General Knowledge</option>
+            <option value="maths">Maths</option>
+            <option value="reasoning">Reasoning</option>
+            <option value="english">English</option>
+            <option value="bihar-gk">Bihar GK</option>
+            <option value="current-affairs">Current Affairs</option>
+          </select></div>
+        <div><label>Topic</label><input type="text" id="qTopic" placeholder="e.g. Percentage, History, Tenses"></div>
+      </div>
+      <label>Question</label><textarea id="qText" placeholder="Question text..."></textarea>
+      <div class="row">
+        <div><label>Option A</label><input type="text" id="qO0"></div>
+        <div><label>Option B</label><input type="text" id="qO1"></div>
+      </div>
+      <div class="row">
+        <div><label>Option C</label><input type="text" id="qO2"></div>
+        <div><label>Option D</label><input type="text" id="qO3"></div>
+      </div>
+      <div class="row3">
+        <div><label>Correct answer</label>
+          <select id="qAns"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select></div>
+        <div><label>Language</label>
+          <select id="qLang"><option value="hi">Hindi</option><option value="en">English</option><option value="ur">Urdu</option></select></div>
+        <div><label>&nbsp;</label><button class="btn ghost small" onclick="resetQForm()">Clear form</button></div>
+      </div>
+      <label>Explanation</label><textarea id="qExp" placeholder="Why is this the answer? (shown after attempt)"></textarea>
+      <button class="btn" id="qSaveBtn" onclick="saveQuestion()">💾 Save Question</button>
+    </div>
+    <div class="card">
+      <h3>All questions</h3>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Question</th><th>Subject</th><th>Exams</th><th>Lang</th><th>Actions</th></tr></thead>
+        <tbody id="qTable"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ================= TESTS ================= -->
+  <section id="tab-tests" class="tab">
+    <h2>🧪 Test Builder</h2>
+    <div class="card">
+      <h3>Create mock test</h3>
+      <div class="row">
+        <div><label>Test name</label><input type="text" id="tName" placeholder="e.g. Bihar Police Mock 01"></div>
+        <div><label>Exam</label><select id="tExam"></select></div>
+      </div>
+      <div class="row3">
+        <div><label>Time (minutes)</label><input type="number" id="tTime" value="60" min="1"></div>
+        <div><label>Total marks</label><input type="number" id="tMarks" value="100" min="1"></div>
+        <div><label>Negative marking</label>
+          <select id="tNeg"><option value="0">None</option><option value="0.25">0.25</option><option value="0.5">0.50</option><option value="1">1.00</option></select></div>
+      </div>
+      <label>Pick questions (search, tick, then "Add ticked")</label>
+      <input type="text" id="tQSearch" placeholder="🔍 filter questions..." oninput="renderTPicker()" style="margin-bottom:8px">
+      <div id="tPicker" style="max-height:260px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:10px"></div>
+      <div class="toolbar" style="margin-top:10px">
+        <button class="btn ghost small" onclick="addTicked()">Add ticked →</button>
+        <span class="muted" id="tSelCount">0 questions selected</span>
+      </div>
+      <label><input type="checkbox" id="tPub" checked style="width:auto; margin-right:8px">Published (visible in app)</label>
+      <button class="btn" onclick="saveTest()">💾 Save Test</button>
+    </div>
+    <div class="card">
+      <h3>All tests</h3>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Name</th><th>Exam</th><th>Qs</th><th>Time</th><th>Published</th><th>Actions</th></tr></thead>
+        <tbody id="tTable"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ================= COMPETITIONS ================= -->
+  <section id="tab-comp" class="tab">
+    <h2>⚔️ Competition Manager</h2>
+    <div class="card">
+      <h3>Create competition</h3>
+      <div class="row">
+        <div><label>Title</label><input type="text" id="cTitle" placeholder="e.g. Sunday Grand Test"></div>
+        <div><label>Type</label>
+          <select id="cType"><option value="daily">Daily Battle (10 Qs)</option><option value="subject">Subject Battle (25 Qs)</option><option value="exam">Exam Battle (50 Qs)</option><option value="grand">Grand Test (100 Qs)</option></select></div>
+      </div>
+      <div class="row3">
+        <div><label>Start time</label><input type="datetime-local" id="cStart"></div>
+        <div><label>End time</label><input type="datetime-local" id="cEnd"></div>
+        <div><label>Question count</label><input type="number" id="cCount" value="10" min="1"></div>
+      </div>
+      <button class="btn" onclick="saveCompetition()">💾 Create Competition</button>
+    </div>
+    <div class="card">
+      <h3>All competitions</h3>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Title</th><th>Type</th><th>Start</th><th>End</th><th>Qs</th><th>Actions</th></tr></thead>
+        <tbody id="cTable"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ================= NOTIFICATIONS ================= -->
+  <section id="tab-notif" class="tab">
+    <h2>🔔 Notification Sender</h2>
+    <div class="notice">App polls the <code>notifications</code> collection on launch and shows new items. (True push via FCM needs the google-services.json step — see FIREBASE_SETUP.md.)</div>
+    <div class="card">
+      <h3>Send notification</h3>
+      <label>Title</label><input type="text" id="nTitle" placeholder="e.g. 🔥 Today's Challenge is live">
+      <label>Message</label><textarea id="nMsg" placeholder="Notification message..."></textarea>
+      <button class="btn" onclick="sendNotification()">📤 Send</button>
+    </div>
+    <div class="card">
+      <h3>Sent notifications</h3>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Title</th><th>Message</th><th>Sent at</th><th>Actions</th></tr></thead>
+        <tbody id="nTable"></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+
+<footer>Made for Hasnain • RuhRank Admin • writes require Firebase admin sign-in (see firestore.rules)</footer>
+
+<script>
+/* ================================================================
+   CONFIG
+   ----------------------------------------------------------------
+   1) Panel gate password (client-side only — change it, but remember
+      the REAL protection is firestore.rules: only your Firebase Auth
+      admin UID can write. This gate just keeps casual visitors out.)
+   ================================================================ */
+const ADMIN_PANEL_PASSWORD = "ruhrank2026"; // <-- change me
+
+/* ================================================================
+   2) Firebase config — Hasnain will inject real config.
+   In this file, right BEFORE this script tag, paste:
+     <script>window.RR_FIREBASE_CONFIG = { apiKey:"...", authDomain:"...",
+       projectId:"...", storageBucket:"...", messagingSenderId:"...",
+       appId:"..." };</script>
+   (Firebase console → Project settings → Your apps → Web app → copy.)
+   ================================================================ */
+const firebaseConfig = window.RR_FIREBASE_CONFIG || {};
+
+const EXAMS = ["ssc-cgl","ssc-chsl","ssc-mts","ssc-gd","rrb-ntpc","group-d","alp","bihar-police","bihar-si","bpsc","ibps","sbi","nda","cds","agniveer","ctet","stet"];
+
+let db = null, auth = null, authed = false;
+let qCache = [];   // questions cache
+let tSel = new Set(); // selected question ids for test builder
+
+/* ---------------- password gate ---------------- */
+function unlockGate(){
+  const v = document.getElementById('gatePass').value;
+  if(v === ADMIN_PANEL_PASSWORD){
+    document.getElementById('gate').style.display = 'none';
+    initApp();
+  } else {
+    document.getElementById('gateErr').textContent = '❌ Wrong password';
+  }
+}
+document.getElementById('gatePass').addEventListener('keydown', e=>{ if(e.key==='Enter') unlockGate(); });
+
+/* ---------------- tabs ---------------- */
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+/* ---------------- init ---------------- */
+function initApp(){
+  buildExamCheckboxes(); buildExamSelect();
+  if(!firebaseConfig.apiKey){
+    document.getElementById('cfgWarn').classList.remove('hidden');
+    return;
+  }
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  auth = firebase.auth();
+  auth.onAuthStateChanged(u=>{
+    authed = !!u;
+    const b = document.getElementById('authBadge');
+    b.textContent = u ? ('Signed in: '+u.email) : 'Not signed in';
+    b.className = 'badge ' + (u ? 'on' : 'off');
+    document.getElementById('authBtn').textContent = u ? 'Sign out' : 'Sign in';
+  });
+  loadStats(); loadQuestions(); loadTests(); loadCompetitions(); loadNotifications();
+}
+
+/* ---------------- auth (email/password — admin only) ---------------- */
+function toggleAuth(){
+  if(!auth){ alert('Firebase not configured yet.'); return; }
+  if(auth.currentUser){ auth.signOut(); return; }
+  const email = prompt('Admin email:');
+  if(!email) return;
+  const pass = prompt('Admin password:');
+  if(!pass) return;
+  auth.signInWithEmailAndPassword(email, pass).catch(e=>alert('Sign-in failed: '+e.message));
+}
+function needAuth(){
+  if(!authed){ alert('⚠️ Pehle "Sign in" karo (top-right) — writes need admin login.'); return false; }
+  return true;
+}
+
+/* ---------------- dashboard ---------------- */
+async function loadStats(){
+  if(!db) return;
+  try{
+    const [u,q,t] = await Promise.all([
+      db.collection('users').get(),
+      db.collection('questions').get(),
+      db.collection('tests').get()
+    ]);
+    document.getElementById('stUsers').textContent = u.size;
+    document.getElementById('stQs').textContent = q.size;
+    document.getElementById('stTests').textContent = t.size;
+    const dayStart = new Date(); dayStart.setHours(0,0,0,0);
+    const a = await db.collection('attempts').where('ts','>=',dayStart.getTime()).get();
+    document.getElementById('stAttempts').textContent = a.size;
+  }catch(e){ console.warn('stats:', e.message); }
+}
+</script>
+
+<script>
+/* ---------------- questions CRUD ---------------- */
+function buildExamCheckboxes(){
+  const box = document.getElementById('qExams');
+  box.innerHTML = EXAMS.map(e=>`<label><input type="checkbox" value="${e}"> ${e}</label>`).join('');
+}
+function getCheckedExams(){
+  return [...document.querySelectorAll('#qExams input:checked')].map(i=>i.value);
+}
+function setCheckedExams(arr){
+  document.querySelectorAll('#qExams input').forEach(i=>{ i.checked = (arr||[]).includes(i.value); });
+}
+async function loadQuestions(){
+  if(!db) return;
+  const s = await db.collection('questions').orderBy('createdAt','desc').limit(500).get();
+  qCache = s.docs.map(d=>({id:d.id, ...d.data()}));
+  renderQList(); renderTPicker();
+}
+function renderQList(){
+  const f = (document.getElementById('qSearch').value||'').toLowerCase();
+  const rows = qCache.filter(q=>{
+    if(!f) return true;
+    return (q.q||'').toLowerCase().includes(f) || (q.subject||'').includes(f) || (q.topic||'').toLowerCase().includes(f);
+  });
+  document.getElementById('qCount').textContent = rows.length + ' shown / ' + qCache.length + ' total';
+  document.getElementById('qTable').innerHTML = rows.map(q=>`
+    <tr>
+      <td class="q-text">${esc(q.q)}<br><span class="muted">${esc(q.topic||'')}</span></td>
+      <td><span class="pill">${esc(q.subject||'')}</span></td>
+      <td>${(q.exams||[]).slice(0,3).map(e=>`<span class="pill">${e}</span>`).join('')}${(q.exams||[]).length>3?'<span class="muted">+'+(q.exams.length-3)+'</span>':''}</td>
+      <td>${esc(q.lang||'hi')}</td>
+      <td style="white-space:nowrap">
+        <button class="btn small ghost" onclick="editQuestion('${q.id}')">Edit</button>
+        <button class="btn small danger" onclick="delQuestion('${q.id}')">Delete</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">No questions yet.</td></tr>';
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function readQForm(){
+  const exams = getCheckedExams();
+  const q = document.getElementById('qText').value.trim();
+  const opts = [0,1,2,3].map(i=>document.getElementById('qO'+i).value.trim());
+  if(!exams.length){ alert('Select at least one exam.'); return null; }
+  if(!q){ alert('Question text required.'); return null; }
+  if(opts.some(o=>!o)){ alert('All 4 options required.'); return null; }
+  return {
+    exams,
+    subject: document.getElementById('qSubject').value,
+    topic: document.getElementById('qTopic').value.trim(),
+    q, opts,
+    ans: parseInt(document.getElementById('qAns').value,10),
+    exp: document.getElementById('qExp').value.trim(),
+    lang: document.getElementById('qLang').value,
+    createdAt: Date.now()
+  };
+}
+async function saveQuestion(){
+  if(!db || !needAuth()) return;
+  const data = readQForm(); if(!data) return;
+  const editId = document.getElementById('qEditId').value;
+  try{
+    if(editId){ await db.collection('questions').doc(editId).update(data); }
+    else { await db.collection('questions').add(data); }
+    resetQForm(); loadQuestions(); loadStats();
+  }catch(e){ alert('Save failed: '+e.message); }
+}
+function editQuestion(id){
+  const q = qCache.find(x=>x.id===id); if(!q) return;
+  document.getElementById('qEditId').value = id;
+  document.getElementById('qFormTitle').textContent = 'Edit question';
+  setCheckedExams(q.exams);
+  document.getElementById('qSubject').value = q.subject||'gk';
+  document.getElementById('qTopic').value = q.topic||'';
+  document.getElementById('qText').value = q.q||'';
+  [0,1,2,3].forEach(i=>{ document.getElementById('qO'+i).value = (q.opts||[])[i]||''; });
+  document.getElementById('qAns').value = String(q.ans==null?0:q.ans);
+  document.getElementById('qLang').value = q.lang||'hi';
+  document.getElementById('qExp').value = q.exp||'';
+  document.getElementById('qSaveBtn').textContent = '💾 Update Question';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function resetQForm(){
+  document.getElementById('qEditId').value = '';
+  document.getElementById('qFormTitle').textContent = 'Add new question';
+  setCheckedExams([]);
+  ['qTopic','qText','qO0','qO1','qO2','qO3','qExp'].forEach(i=>{ document.getElementById(i).value=''; });
+  document.getElementById('qSaveBtn').textContent = '💾 Save Question';
+}
+async function delQuestion(id){
+  if(!db || !needAuth()) return;
+  if(!confirm('Delete this question permanently?')) return;
+  try{ await db.collection('questions').doc(id).delete(); loadQuestions(); loadStats(); }
+  catch(e){ alert('Delete failed: '+e.message); }
+}
+</script>
+
+<script>
+/* ---------------- test builder ---------------- */
+function buildExamSelect(){
+  document.getElementById('tExam').innerHTML = EXAMS.map(e=>`<option value="${e}">${e}</option>`).join('');
+}
+function renderTPicker(){
+  const f = (document.getElementById('tQSearch').value||'').toLowerCase();
+  const rows = qCache.filter(q=>{
+    if(!f) return true;
+    return (q.q||'').toLowerCase().includes(f) || (q.subject||'').includes(f) || (q.topic||'').toLowerCase().includes(f);
+  }).slice(0,200);
+  document.getElementById('tPicker').innerHTML = rows.map(q=>`
+    <label style="display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px">
+      <input type="checkbox" data-tpick="${q.id}" ${tSel.has(q.id)?'checked':''} style="width:auto;margin-top:3px">
+      <span>${esc((q.q||'').slice(0,90))}... <span class="pill">${esc(q.subject||'')}</span></span>
+    </label>`).join('') || '<p class="muted">No questions match.</p>';
+  document.querySelectorAll('[data-tpick]').forEach(c=>c.addEventListener('change', ()=>{
+    if(c.checked) tSel.add(c.dataset.tpick); else tSel.delete(c.dataset.tpick);
+    updateTSelCount();
+  }));
+  updateTSelCount();
+}
+function updateTSelCount(){ document.getElementById('tSelCount').textContent = tSel.size + ' questions selected'; }
+function addTicked(){ renderTPicker(); /* checkboxes already synced via tSel */ alert(tSel.size + ' questions selected for this test.'); }
+
+async function saveTest(){
+  if(!db || !needAuth()) return;
+  const name = document.getElementById('tName').value.trim();
+  if(!name){ alert('Test name required.'); return; }
+  if(!tSel.size){ alert('Pick at least one question.'); return; }
+  const data = {
+    name,
+    exam: document.getElementById('tExam').value,
+    questionIds: [...tSel],
+    timeMin: parseInt(document.getElementById('tTime').value,10)||60,
+    totalMarks: parseInt(document.getElementById('tMarks').value,10)||100,
+    negative: parseFloat(document.getElementById('tNeg').value)||0,
+    published: document.getElementById('tPub').checked,
+    createdAt: Date.now()
+  };
+  try{
+    await db.collection('tests').add(data);
+    document.getElementById('tName').value=''; tSel.clear(); renderTPicker();
+    loadTests(); loadStats(); alert('✅ Test saved!');
+  }catch(e){ alert('Save failed: '+e.message); }
+}
+async function loadTests(){
+  if(!db) return;
+  const s = await db.collection('tests').orderBy('createdAt','desc').limit(100).get();
+  document.getElementById('tTable').innerHTML = s.docs.map(d=>{
+    const t = d.data();
+    return `<tr>
+      <td>${esc(t.name)}</td><td><span class="pill">${esc(t.exam||'')}</span></td>
+      <td>${(t.questionIds||[]).length}</td><td>${t.timeMin} min</td>
+      <td>${t.published?'✅':'❌'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn small ghost" onclick="togglePublish('${d.id}',${!t.published})">${t.published?'Unpublish':'Publish'}</button>
+        <button class="btn small danger" onclick="delDoc('tests','${d.id}',loadTests)">Delete</button>
+      </td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted">No tests yet.</td></tr>';
+}
+async function togglePublish(id, val){
+  if(!db || !needAuth()) return;
+  try{ await db.collection('tests').doc(id).update({published:val}); loadTests(); }
+  catch(e){ alert('Failed: '+e.message); }
+}
+async function delDoc(col, id, reload){
+  if(!db || !needAuth()) return;
+  if(!confirm('Delete permanently?')) return;
+  try{ await db.collection(col).doc(id).delete(); reload(); loadStats(); }
+  catch(e){ alert('Delete failed: '+e.message); }
+}
+
+/* ---------------- competitions ---------------- */
+async function saveCompetition(){
+  if(!db || !needAuth()) return;
+  const title = document.getElementById('cTitle').value.trim();
+  const start = document.getElementById('cStart').value, end = document.getElementById('cEnd').value;
+  if(!title || !start || !end){ alert('Title, start and end time required.'); return; }
+  const data = {
+    title,
+    type: document.getElementById('cType').value,
+    startTs: new Date(start).getTime(),
+    endTs: new Date(end).getTime(),
+    questionCount: parseInt(document.getElementById('cCount').value,10)||10,
+    createdAt: Date.now()
+  };
+  try{
+    await db.collection('competitions').add(data);
+    document.getElementById('cTitle').value='';
+    loadCompetitions(); alert('✅ Competition created!');
+  }catch(e){ alert('Save failed: '+e.message); }
+}
+async function loadCompetitions(){
+  if(!db) return;
+  const s = await db.collection('competitions').orderBy('createdAt','desc').limit(100).get();
+  document.getElementById('cTable').innerHTML = s.docs.map(d=>{
+    const c = d.data();
+    const st = Date.now() < c.startTs ? '⏳ Upcoming' : (Date.now() > c.endTs ? '✔ Done' : '🔴 LIVE');
+    return `<tr>
+      <td>${esc(c.title)}</td><td><span class="pill">${esc(c.type)}</span></td>
+      <td>${new Date(c.startTs).toLocaleString('en-IN')}</td>
+      <td>${new Date(c.endTs).toLocaleString('en-IN')}</td>
+      <td>${c.questionCount} · ${st}</td>
+      <td><button class="btn small danger" onclick="delDoc('competitions','${d.id}',loadCompetitions)">Delete</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted">No competitions yet.</td></tr>';
+}
+
+/* ---------------- notifications ---------------- */
+async function sendNotification(){
+  if(!db || !needAuth()) return;
+  const title = document.getElementById('nTitle').value.trim();
+  const message = document.getElementById('nMsg').value.trim();
+  if(!title || !message){ alert('Title and message required.'); return; }
+  try{
+    await db.collection('notifications').add({title, message, ts: Date.now()});
+    document.getElementById('nTitle').value=''; document.getElementById('nMsg').value='';
+    loadNotifications(); alert('📤 Notification queued — app will show it on next launch.');
+  }catch(e){ alert('Send failed: '+e.message); }
+}
+async function loadNotifications(){
+  if(!db) return;
+  const s = await db.collection('notifications').orderBy('ts','desc').limit(50).get();
+  document.getElementById('nTable').innerHTML = s.docs.map(d=>{
+    const n = d.data();
+    return `<tr>
+      <td>${esc(n.title)}</td><td class="q-text">${esc(n.message)}</td>
+      <td>${new Date(n.ts).toLocaleString('en-IN')}</td>
+      <td><button class="btn small danger" onclick="delDoc('notifications','${d.id}',loadNotifications)">Delete</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" class="muted">None sent yet.</td></tr>';
+}
+</script>
+</body>
+</html>
