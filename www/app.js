@@ -103,7 +103,7 @@ function loadBank(subj) {
       } catch (e) {}
       bankReady[subj] = true; res();
     };
-    s.onerror = () => res(); // fail-open: bank na mile to app chalti rahe
+    s.onerror = () => { bankReady[subj] = true; res(); }; // fail-open: bank na mile to bhi gate aage badhe, app chalti rahe
     document.head.appendChild(s);
   });
   return loadBank._p[subj];
@@ -450,11 +450,28 @@ function fetchRemoteQB() {
 // ============================================================
 const NAV_SCREENS = ["scr-home", "scr-practice-setup", "scr-mock-setup", "scr-leaderboard", "scr-profile"];
 let navStack = [];
+// Active session ko poori tarah khatm karo (timer + live watch + state)
+function killSession() {
+  if (PR && PR.timerId) clearInterval(PR.timerId);
+  if (MK && MK.timerId) clearInterval(MK.timerId);
+  PR = null; MK = null;
+  try { stopLiveWatch(); } catch (e) {}
+  const lb = $("mkLiveBoard"); if (lb) lb.classList.add("hidden");
+}
 function showScreen(id, push) {
   // Guard: session-bound screens need an active session; else redirect (no dead screens)
   if (id === "scr-practice" && !PR) id = "scr-practice-setup";
   if (id === "scr-mock" && !MK) id = "scr-mock-setup";
   if (id === "scr-result" && !$("resultBody").innerHTML.trim()) id = "scr-home";
+  if (id === "scr-review" && !LAST_REVIEW) id = "scr-home";
+  // Session abandon (data-go / bottom-nav path): practice/mock screen se kahin aur
+  // ja rahe hain aur session zinda hai — bina confirm progress nasht na ho.
+  // (goBack apna check pop se pehle khud karta hai.)
+  const curTop = navStack[navStack.length - 1];
+  if ((curTop === "scr-practice" || curTop === "scr-mock") && (PR || MK) && id !== curTop && id !== "scr-result") {
+    if (!confirmAbandon()) return;
+    killSession();
+  }
   // Live battle cleanup jab screen chhodte hain
   if (id !== "scr-competition" && typeof compTick !== "undefined" && compTick) { clearInterval(compTick); compTick = null; }
   if (id !== "scr-mock") { try { stopLiveWatch(); } catch (e) {} const lb = $("mkLiveBoard"); if (lb) lb.classList.add("hidden"); }
@@ -473,14 +490,23 @@ function showScreen(id, push) {
     "scr-bookmarks": renderBookmarks, "scr-achievements": renderAch, "scr-profile": renderProfile,
     "scr-notifications": renderNotifs, "scr-practice-setup": renderPracticeSetup, "scr-mock-setup": renderMockSetup,
     "scr-search": renderSearch, "scr-pyq": renderPYQScreen, "scr-notes": renderNotes,
-    "scr-syllabus": renderSyllabus
+    "scr-syllabus": renderSyllabus, "scr-review": renderReview, "scr-studyplan": renderStudyPlan
   };
   if (R[id]) try { R[id](); } catch (e) { console.log(e); }
   el.querySelector(".scroll") && (el.querySelector(".scroll").scrollTop = 0);
 }
+function confirmAbandon() {
+  return confirm("⏹️ सेशन चल रहा है — बाहर निकलें?\nप्रगति नष्ट हो जाएगी।");
+}
 function goBack() {
   if (!$("aiModal").classList.contains("hidden")) { $("aiModal").classList.add("hidden"); return; }
   if (!$("genModal").classList.contains("hidden")) { $("genModal").classList.add("hidden"); return; }
+  // session abandon: pop se PEHLE check (pop ke baad curTop kho jata hai)
+  const cur = navStack[navStack.length - 1];
+  if ((cur === "scr-practice" || cur === "scr-mock") && (PR || MK)) {
+    if (!confirmAbandon()) return;
+    killSession();
+  }
   if (navStack.length > 1) { navStack.pop(); showScreen(navStack[navStack.length - 1], false); }
   else showScreen("scr-home", false);
 }
@@ -536,7 +562,12 @@ function checkUpdate(manual) {
         else store.set("upd_rem_w", Date.now());
         $("updateNotes").textContent = (j.notes_hi || "नया अपडेट आ गया है!") + " (v" + j.versionName + ")";
         $("updateDialog").classList.remove("hidden");
-        $("btnDoUpdate").onclick = () => { try { Android.downloadApk(j.apk); } catch (e) { window.open(j.apk, "_blank"); } $("updateDialog").classList.add("hidden"); };
+        const apkUrl = j.apkUrl || j.apk; // version.json me field "apkUrl" hai
+        $("btnDoUpdate").onclick = () => {
+          if (apkUrl) { try { Android.downloadApk(apkUrl); } catch (e) { window.open(apkUrl, "_blank"); } }
+          else toast("डाउनलोड लिंक उपलब्ध नहीं है");
+          $("updateDialog").classList.add("hidden");
+        };
       }
     } else if (manual) toast("सब कुछ नवीनतम है ✅");
     store.set("upd_check", todayKey());
@@ -826,9 +857,10 @@ function startPractice(opts) {
   ensureBanks(need).then(() => startPracticeNow(opts));
 }
 function startPracticeNow(opts) {
-  const qs = pickQuestions(opts);
+  killSession(); // purana session/timer ho to saaf karo (timer corruption se bachao)
+  const qs = opts._qs || pickQuestions(opts);
   if (!qs.length) { toast("इस फ़िल्टर में प्रश्न नहीं मिले"); return; }
-  PR = { qs, i: 0, ans: new Array(qs.length).fill(-1), ok: new Array(qs.length).fill(null), t0: Date.now(), mode: opts.mode || "practice", title: opts.title || "Practice", timed: (opts.mode === "timed") ? 60 * qs.length : 0, timerId: null };
+  PR = { qs, i: 0, ans: new Array(qs.length).fill(-1), ok: new Array(qs.length).fill(null), t0: Date.now(), mode: opts.mode || "practice", title: opts.title || "Practice", challenge: !!opts.challenge, timed: (opts.mode === "timed") ? (opts.challenge ? 30 : 60) * qs.length : 0, timerId: null, skip: new Array(qs.length).fill(false), skipShown: false };
   if (PR.timed) PR.timerId = setInterval(() => {
     PR.timed--;
     const m = Math.floor(PR.timed / 60), s = PR.timed % 60;
@@ -862,6 +894,7 @@ function renderPR() {
       if (PR.mode === "practice" && PR.ans[PR.i] >= 0) return;
       PR.ans[PR.i] = i;
       PR.ok[PR.i] = (i === q.ans);
+      PR.skip[PR.i] = false; // jawab de diya — skip list se hatao
       if (PR.mode === "practice") {
         if (i === q.ans) addXP(10);
         showExp(q, i);
@@ -873,6 +906,48 @@ function renderPR() {
   const ex = $("prExp");
   if (PR.mode === "practice" && picked >= 0) { showExp(q, picked); } else ex.classList.add("hidden");
   $("prExplain").onclick = () => aiExplain(q);
+  $("prReport").onclick = () => openReport(q.id);
+  renderPRPalette();
+}
+// practice palette — skipped alag (orange) color me
+function renderPRPalette() {
+  const p = $("prPalette"); if (!p || !PR) return;
+  p.innerHTML = "";
+  PR.qs.forEach((_, i) => {
+    const d = document.createElement("div");
+    let cls = "pal";
+    if (PR.ans[i] >= 0) cls += " ans";
+    else if (PR.skip[i]) cls += " skipped";
+    d.className = cls; d.textContent = i + 1;
+    d.onclick = () => { PR.i = i; renderPR(); };
+    p.appendChild(d);
+  });
+  const cur = p.children[PR.i];
+  if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest", inline: "center" });
+}
+// chhode hue (unanswered + skipped) prashn
+function pendingSkips() {
+  if (!PR) return [];
+  return PR.qs.map((_, i) => i).filter(i => PR.skip[i] && PR.ans[i] < 0);
+}
+function finishPracticeFlow() {
+  if (!PR) return;
+  const sk = pendingSkips();
+  if (sk.length && !PR.skipShown) { showSkipList(sk); return; }
+  finishPractice();
+}
+function showSkipList(sk) {
+  PR.skipShown = true;
+  openGen("⏭ छोड़े हुए प्रश्न (" + sk.length + ")",
+    `<p style="color:var(--mut)">इन प्रश्नों को अब हल करें, या छोड़कर अभ्यास समाप्त करें।</p>` +
+    sk.map(i => `<button class="btn ghost" data-skipi="${i}">Q${i + 1}. ${esc(PR.qs[i].q.slice(0, 60))}…</button>`).join("") +
+    `<button class="btn gold" id="skDone">✅ बिना इनके समाप्त करें</button>`);
+  $$("#genBody [data-skipi]").forEach(b => b.onclick = () => {
+    $("genModal").classList.add("hidden");
+    PR.i = +b.dataset.skipi;
+    showScreen("scr-practice"); renderPR();
+  });
+  $("skDone").onclick = () => { $("genModal").classList.add("hidden"); finishPractice(); };
 }
 function showExp(q, picked) {
   const ex = $("prExp");
@@ -886,9 +961,17 @@ function finishPractice() {
   const details = PR.qs.map((q, i) => ({ qid: q.id, subject: q.subject, topic: q.topic, ok: PR.ok[i] === true }));
   logAttempt({ kind: "practice", title: PR.title, total, correct, acc: total ? Math.round(correct / total * 100) : 0, secs: Math.round((Date.now() - PR.t0) / 1000), details });
   store.set("last_practice_ts", Date.now());
+  // review screen ke liye session snapshot (Phase 2)
+  LAST_REVIEW = { from: "practice", title: PR.title, qs: PR.qs.slice(), ans: PR.ans.slice(), ok: PR.ok.slice() };
+  // Daily challenge poora hua (timeout ya finish — dono pe)
+  if (PR.challenge) {
+    store.set("ch_done", todayKey());
+    addXP(50);
+    notify("🔥 चुनौती पूर्ण!", "10 प्रश्न पूरे — +50 बोनस XP मिले!");
+  }
   checkAchievements();
   PR = null;
-  openGen("🎉 अभ्यास पूर्ण", `<div class="score-big">${correct}/${total}</div><div class="score-sub">एक्यूरेसी ${total ? Math.round(correct / total * 100) : 0}% • +${correct * 10} XP</div><button class="btn gold" onclick="document.getElementById('genModal').classList.add('hidden');showScreen('scr-performance')">📈 प्रदर्शन देखें</button>`);
+  openGen("🎉 अभ्यास पूर्ण", `<div class="score-big">${correct}/${total}</div><div class="score-sub">एक्यूरेसी ${total ? Math.round(correct / total * 100) : 0}% • +${correct * 10} XP</div><button class="btn gold" onclick="REV_F='all';document.getElementById('genModal').classList.add('hidden');showScreen('scr-review')">📝 उत्तर देखें</button><button class="btn ghost" onclick="document.getElementById('genModal').classList.add('hidden');showScreen('scr-performance')">📈 प्रदर्शन देखें</button>`);
 }
 
 // ---- AI Explain ----
@@ -939,7 +1022,8 @@ function buildMockQuestions() {
     const seen = new Set(); (store.get("history", [])).forEach(h => (h.details || []).forEach(d => seen.add(d.qid)));
     const fresh = QB.filter(q => !seen.has(q.id));
     const pool = weak.concat(fresh.filter(q => weak.indexOf(q) < 0)).concat(QB);
-    qs = pool.slice(0, ex.total);
+    const usedIds = new Set();
+    qs = pool.filter(q => { if (!q || !q.id || usedIds.has(q.id)) return false; usedIds.add(q.id); return true; }).slice(0, ex.total);
     return { qs, title: "🤖 स्मार्ट टेस्ट", ex };
   }
   if (MS.type === "pyq") {
@@ -954,6 +1038,14 @@ function buildMockQuestions() {
     qs = qs.concat(shuffle(pool).slice(0, ex.sections[s]));
   });
   if (qs.length < ex.total) qs = qs.concat(shuffle(QB).slice(0, ex.total - qs.length));
+  // dedupe by id (pools overlap kar sakte hain — smart/full top-up)
+  const seenIds = new Set();
+  qs = qs.filter(q => { if (!q || !q.id || seenIds.has(q.id)) return false; seenIds.add(q.id); return true; });
+  if (qs.length < ex.total) {
+    const extra = shuffle(QB.filter(q => !seenIds.has(q.id))).slice(0, ex.total - qs.length);
+    extra.forEach(q => seenIds.add(q.id));
+    qs = qs.concat(extra);
+  }
   return { qs: qs.slice(0, ex.total), title: "🧪 " + ex.name + " मॉक", ex };
 }
 let MK = null;
@@ -964,6 +1056,7 @@ function startMock() {
   ensureBanks(need).then(() => startMockNow());
 }
 function startMockNow() {
+  killSession(); // purana session/timer ho to saaf karo
   const b = buildMockQuestions();
   if (!b.qs.length) { toast("प्रश्न नहीं मिले"); return; }
   MK = {
@@ -1036,7 +1129,7 @@ function submitMock(auto) {
     let ok = null;
     if (a < 0) skipped++;
     else if (a === q.ans) { correct++; ok = true; } else { wrong++; ok = false; }
-    return { qid: q.id, subject: q.subject, topic: q.topic, ok };
+    return { qid: q.id, subject: q.subject, topic: q.topic, ok, a };
   });
   const negMarks = +(wrong * ex.neg).toFixed(2);
   const raw = correct * ex.marks;
@@ -1054,7 +1147,9 @@ function submitMock(auto) {
   store.set("last_practice_ts", Date.now());
   addXP(correct * 10);
   checkAchievements();
-  const resQ = MK.qs.slice(); MK = null;
+  const resQ = MK.qs.slice(); const resAns = MK.ans.slice(); MK = null;
+  // review screen ke liye session snapshot (Phase 2)
+  LAST_REVIEW = { from: "mock", title: rec.title, qs: resQ, ans: resAns, ok: resAns.map((a, i) => a < 0 ? null : (a === resQ[i].ans)) };
   try { stopLiveWatch(); } catch (e) {}
   if (liveId) submitLiveFinal(liveId, rec);
   renderResult(rec, resQ);
@@ -1096,27 +1191,132 @@ function renderResult(r, qs) {
     </div>
     <div class="row2">
       <button class="btn ghost" id="resWeak">⚠️ कमज़ोर टॉपिक अभ्यास</button>
-    </div>
-    <div id="revBox"></div>`;
+    </div>`;
   $("resRetry").onclick = () => showScreen("scr-mock-setup");
   $("resShare").onclick = () => shareScore(r);
   $("resWeak").onclick = () => startPractice({ mode: "weak", count: 25, title: "कमज़ोर टॉपिक अभ्यास" });
-  $("resReview").onclick = () => {
-    const rb = $("revBox"); rb.innerHTML = "";
-    qs.forEach((q, i) => {
-      const d = r.details[i];
-      const div = document.createElement("div");
-      div.className = "glass card rev-q";
-      div.innerHTML = `<div class="rq"><b>Q${i + 1}.</b> ${esc(q.q)} ${d.ok === true ? "✅" : d.ok === false ? "❌" : "⏭️"}</div>
-        ${q.d ? '<div class="diagram-box">' + renderDiagram(q.d) + '</div>' : ''}
-        <div style="font-size:13px;color:var(--mut)">सही: <b style="color:var(--green)">${esc(q.opts[q.ans])}</b></div>
-        <div style="font-size:13px;margin-top:4px">${esc(q.exp || "")}</div>
-        <button class="btn sm ghost" style="margin-top:8px">🤖 Explain</button>`;
-      div.querySelector("button").onclick = () => aiExplain(q);
-      rb.appendChild(div);
-    });
-    rb.scrollIntoView();
+  $("resReview").onclick = () => { REV_F = "all"; showScreen("scr-review"); };
+}
+
+// ============================================================
+// ANSWER REVIEW SCREEN (Phase 2)
+// ============================================================
+let LAST_REVIEW = null; // { from, title, qs, ans, ok }
+let REV_F = "all";
+function renderReview() {
+  const R = LAST_REVIEW;
+  if (!R || !R.qs || !R.qs.length) { toast("समीक्षा हेतु कोई सेशन नहीं"); goBack(); return; }
+  const items = R.qs.map((q, i) => {
+    const a = R.ans[i];
+    return { q, a, st: a < 0 ? "skip" : (a === q.ans ? "ok" : "bad"), i };
+  });
+  const counts = { all: items.length, ok: 0, bad: 0, skip: 0 };
+  items.forEach(it => counts[it.st]++);
+  const chips = [["all", "📋 सब (" + counts.all + ")"], ["ok", "✅ सही (" + counts.ok + ")"],
+                 ["bad", "❌ गलत (" + counts.bad + ")"], ["skip", "⏭️ छोड़े (" + counts.skip + ")"]];
+  $("revChips").innerHTML = chips.map(c =>
+    `<button class="chip ${REV_F === c[0] ? "on" : ""}" data-f="${c[0]}">${c[1]}</button>`).join("");
+  $$("#revChips .chip").forEach(c => c.onclick = () => { REV_F = c.dataset.f; renderReview(); });
+  const list = items.filter(it => REV_F === "all" || it.st === REV_F);
+  $("revList").innerHTML = list.length ? list.map(it => {
+    const q = it.q;
+    const cls = it.st === "ok" ? "rev-card-ok" : it.st === "bad" ? "rev-card-bad" : "rev-card-skip";
+    const badge = it.st === "ok" ? "✅" : it.st === "bad" ? "❌" : "⏭️";
+    const yourCol = it.st === "ok" ? "var(--green)" : it.st === "bad" ? "var(--red)" : "var(--mut)";
+    const optsHtml = q.opts.map((o, i) => {
+      let oc = "opt ro";
+      if (i === q.ans) oc += " right";
+      else if (i === it.a) oc += " wrong";
+      else oc += " dim";
+      return `<div class="${oc}"><span class="k">${"ABCD"[i]}</span><span>${esc(o)}</span></div>`;
+    }).join("");
+    return `<div class="glass card ${cls}">
+      <div class="rq"><b>Q${it.i + 1}.</b> ${esc(q.q)} ${badge}</div>
+      ${q.d ? '<div class="diagram-box">' + renderDiagram(q.d) + '</div>' : ""}
+      ${optsHtml}
+      <div style="font-size:13px;margin-top:6px">आपका उत्तर: <b style="color:${yourCol}">${it.a >= 0 ? esc(q.opts[it.a]) : "— नहीं दिया —"}</b></div>
+      <div style="font-size:13px">सही उत्तर: <b style="color:var(--green)">${esc(q.opts[q.ans])}</b></div>
+      ${q.exp ? `<div style="font-size:13px;color:var(--mut);margin-top:6px">💡 ${esc(q.exp)}</div>` : ""}
+      <div class="qacts" style="margin-top:8px">
+        <button class="btn sm ghost" onclick="aiExplainById('${q.id}')">🤖 Explain</button>
+        <button class="btn sm ghost" onclick="openReport('${q.id}')">⚠️ गलती रिपोर्ट करें</button>
+      </div></div>`;
+  }).join("") : `<p style="color:var(--mut);text-align:center;margin-top:30px">इस फ़िल्टर में कोई प्रश्न नहीं।</p>`;
+  $("revBackRes").onclick = () => {
+    if (LAST_REVIEW && LAST_REVIEW.from === "mock" && $("resultBody").innerHTML.trim()) showScreen("scr-result");
+    else showScreen("scr-practice-setup");
   };
+  $("revHome").onclick = () => showScreen("scr-home");
+}
+
+// ============================================================
+// QUESTION REPORT — "⚠️ गलती रिपोर्ट करें" (Phase 2)
+// Firestore `reports` collection me save; offline ho to toast.
+// ============================================================
+const REP_REASONS = ["गलत उत्तर", "गलत व्याख्या", "टाइपो / वर्तनी", "प्रश्न अस्पष्ट", "अन्य"];
+window.openReport = function (qid) {
+  if (!FB.on || !navigator.onLine) { toast("🌐 इंटरनेट आवश्यक — रिपोर्ट भेजने के लिए ऑनलाइन आएँ"); return; }
+  const q = QB.find(x => x.id === qid);
+  if (!q) { toast("प्रश्न नहीं मिला"); return; }
+  let reason = REP_REASONS[0];
+  openGen("⚠️ गलती रिपोर्ट करें",
+    `<div style="font-size:13px;color:var(--mut);margin-bottom:10px">Q: ${esc(q.q.slice(0, 90))}${q.q.length > 90 ? "…" : ""}</div>
+     <div class="chip-row" id="repChips">${REP_REASONS.map((r, i) =>
+       `<button class="chip ${i === 0 ? "on" : ""}" data-r="${esc(r)}">${esc(r)}</button>`).join("")}</div>
+     <textarea id="repNote" class="searchbox" placeholder="विवरण लिखें (वैकल्पिक)…"></textarea>
+     <button class="btn gold" id="repSend" style="margin-top:10px">📤 रिपोर्ट भेजें</button>`);
+  $$("#repChips .chip").forEach(c => c.onclick = () => {
+    $$("#repChips .chip").forEach(x => x.classList.remove("on"));
+    c.classList.add("on"); reason = c.dataset.r;
+  });
+  $("repSend").onclick = () => {
+    const note = (($("repNote") || {}).value || "").trim().slice(0, 500);
+    try {
+      FB.db.collection("reports").add({
+        uid: FB.uid || "local", qid: q.id, subject: q.subject || "",
+        topic: q.topic || "", reason: reason, note: note, ts: Date.now()
+      }).then(() => { $("genModal").classList.add("hidden"); toast("✅ रिपोर्ट भेज दी गई — धन्यवाद!"); })
+        .catch(() => toast("❌ रिपोर्ट नहीं भेजी जा सकी — पुनः प्रयास करें"));
+    } catch (e) { toast("❌ रिपोर्ट नहीं भेजी जा सकी"); }
+  };
+};
+
+// ============================================================
+// 30-DAY STUDY PLAN (Phase 2) — plan data: studyplan.js
+// ============================================================
+let SP_EXAM = "daroga";
+function spState() { return store.get("sp_" + SP_EXAM, { done: {} }); }
+function renderStudyPlan() {
+  $("spExams").innerHTML = STUDY_PLAN_EXAMS.map(e =>
+    `<button class="chip ${SP_EXAM === e.id ? "on" : ""}" data-e="${e.id}">${e.icon} ${e.name}</button>`).join("");
+  $$("#spExams .chip").forEach(c => c.onclick = () => { SP_EXAM = c.dataset.e; renderStudyPlan(); });
+  const exDef = STUDY_PLAN_EXAMS.find(e => e.id === SP_EXAM) || STUDY_PLAN_EXAMS[0];
+  const days = genStudyPlan(exDef.syl);
+  const st = spState();
+  let totalItems = 0, doneItems = 0;
+  days.forEach(d => d.items.forEach((_, k) => { totalItems++; if (st.done[d.day + ":" + k]) doneItems++; }));
+  const pct = totalItems ? Math.round(doneItems / totalItems * 100) : 0;
+  const curDay = (days.find(d => d.items.some((_, k) => !st.done[d.day + ":" + k])) || { day: 30 }).day;
+  $("spProg").innerHTML = `<div class="bar-row"><div class="bl"><span>📅 ${esc(exDef.name)} — Day ${curDay}/30</span><span>${pct}%</span></div>
+    <div class="bar"><div class="fill" style="width:${pct}%"></div></div></div>
+    <small style="color:var(--mut)">${doneItems}/${totalItems} टॉपिक पूर्ण • <a href="#" id="spReset" style="color:var(--gold2)">🔄 रीसेट</a></small>`;
+  $("spReset").onclick = e => { e.preventDefault(); if (confirm("योजना रीसेट करें? सारी टिक हट जाएँगी।")) { store.set("sp_" + SP_EXAM, { done: {} }); renderStudyPlan(); } };
+  $("spDays").innerHTML = days.map(d => {
+    const allDone = d.items.every((_, k) => st.done[d.day + ":" + k]);
+    return `<div class="glass card plan-day ${allDone ? "done" : ""}"><b>${esc(d.label)}</b>` +
+      (d.note ? `<div style="color:var(--mut);font-size:13px;margin:4px 0">${esc(d.note)}</div>` : "") +
+      d.items.map((it, k) => {
+        const kk = d.day + ":" + k; const on = !!st.done[kk];
+        return `<label class="syl-row ${on ? "done" : ""}"><input type="checkbox" data-k="${kk}" ${on ? "checked" : ""}><span><b>${esc(it.sec)}</b> — ${esc(it.topic)}</span></label>`;
+      }).join("") + `</div>`;
+  }).join("");
+  $$("#spDays input[type=checkbox]").forEach(cb => cb.onchange = () => {
+    const s = spState();
+    if (cb.checked) s.done[cb.dataset.k] = 1; else delete s.done[cb.dataset.k];
+    store.set("sp_" + SP_EXAM, s);
+    renderStudyPlan();
+  });
+  $("spDays").scrollTop = 0;
 }
 
 // ============================================================
@@ -1181,12 +1381,8 @@ function renderChallenge() {
       <button class="btn ${done ? "ghost" : "gold"} big" id="btnChGo" ${done ? "disabled" : ""}>${done ? "✅ आज की चुनौती पूर्ण!" : "▶️ चुनौती शुरू करें"}</button>
     </div>`;
   if (!done) $("btnChGo").onclick = () => {
-    // 10Q timed practice; on finish mark done
-    const oldFinish = finishPractice;
-    startPractice({ mode: "timed", count: 10, title: "Daily Challenge" });
-    const iv = setInterval(() => {
-      if (!PR) { clearInterval(iv); store.set("ch_done", todayKey()); addXP(50); notify("🔥 चुनौती पूर्ण!", "+50 बोनस XP मिले!"); }
-    }, 1000);
+    // challenge flag se finishPractice khud done mark karega (+50 XP) — koi polling nahi
+    startPractice({ mode: "timed", count: 10, title: "Daily Challenge", challenge: true });
   };
 }
 
@@ -1411,6 +1607,7 @@ window.startLiveBattle = function (id) {
   const j = store.get("joined_comp", {}); j[id] = 1; store.set("joined_comp", j);
   const mins = Math.max(1, Math.round(((c.endTs || (c.startTs + count * 60000)) - Date.now()) / 60000));
   livePushT = 0;
+  killSession();
   MK = {
     qs, ex: { total: qs.length, mins, marks: 1, neg: 0.25, sections: {} },
     title: "🔴 " + (c.title || "लाइव बैटल"), i: 0,
@@ -1467,6 +1664,7 @@ window.startCompBattle = function (id) {
   ensureBanks().then(() => startCompBattleNow(id));
 };
 function startCompBattleNow(id) {
+  killSession();
   const t = COMP_TYPES.find(x => x.id === id) || COMP_TYPES[0];
   // time-windowed mock vs bots
   const qs = shuffle(QB).slice(0, t.count);
@@ -1490,36 +1688,72 @@ function startCompBattleNow(id) {
 };
 
 // ============================================================
-// PERFORMANCE
+// PERFORMANCE ANALYTICS (Phase 2) — SVG charts
 // ============================================================
 function renderPerf() {
   const h = store.get("history", []);
-  const tests = h.length, qs = totalSolved();
-  const acc = h.length ? Math.round(h.reduce((s, x) => s + (x.acc || 0), 0) / h.length) : 0;
-  const avg = h.length ? Math.round(h.reduce((s, x) => s + (x.pct != null ? x.pct : x.acc || 0), 0) / h.length) : 0;
+  const tests = h.length;
+  let att = 0, okc = 0;
+  h.forEach(x => (x.details || []).forEach(d => { att++; if (d.ok) okc++; }));
+  const acc = att ? Math.round(okc / att * 100) : 0;
   const best = myLocalRank().rank;
-  // subject-wise
+  // ---- subject-wise accuracy (SVG bars) ----
   const sub = {};
   h.forEach(x => (x.details || []).forEach(d => {
     sub[d.subject] = sub[d.subject] || { att: 0, ok: 0 };
     sub[d.subject].att++; if (d.ok) sub[d.subject].ok++;
   }));
+  const subs = Object.keys(sub)
+    .map(s => ({ s, a: Math.round(sub[s].ok / sub[s].att * 100), n: sub[s].att }))
+    .sort((a, b) => b.n - a.n);
+  let barsSVG = "";
+  if (subs.length) {
+    const W = 320, bh = 24, gap = 10, H = subs.length * (bh + gap) + 14;
+    barsSVG = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img">` + subs.map((r, i) => {
+      const y = 8 + i * (bh + gap);
+      const bw = Math.max(3, (W - 130) * r.a / 100);
+      const col = r.a < 60 ? "#ff5b5b" : r.a < 80 ? "#f5b301" : "#2ecc71";
+      const nm = esc((SUBJECTS[r.s] ? SUBJECTS[r.s].name : r.s)).slice(0, 14);
+      return `<text x="2" y="${y + 17}" class="ch-lab">${nm}</text>` +
+        `<rect x="118" y="${y}" width="${W - 130}" height="${bh - 6}" rx="6" class="ch-bg"/>` +
+        `<rect x="118" y="${y}" width="${bw.toFixed(1)}" height="${bh - 6}" rx="6" fill="${col}"/>` +
+        `<text x="${W - 2}" y="${y + 17}" text-anchor="end" class="ch-val">${r.a}%</text>`;
+    }).join("") + `</svg>`;
+  }
+  // ---- last 7 tests score trend (SVG line) ----
+  const last7 = h.slice(0, 7).reverse();
+  let trendSVG = "";
+  if (last7.length >= 2) {
+    const W = 320, H = 150, pad = 26;
+    const vals = last7.map(x => x.pct != null ? x.pct : (x.acc || 0));
+    const pts = vals.map((v, i) => [
+      pad + (W - 2 * pad) * (i / (vals.length - 1)),
+      H - pad - (H - 2 * pad) * (Math.min(100, Math.max(0, v)) / 100), v
+    ]);
+    const line = pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+    trendSVG = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img">
+      <line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" class="ch-axis"/>
+      <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" class="ch-axis"/>
+      <polyline points="${line}" class="ch-line"/>` +
+      pts.map((p, i) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5" class="ch-dot"/>` +
+        `<text x="${p[0].toFixed(1)}" y="${(p[1] - 10).toFixed(1)}" text-anchor="middle" class="ch-val">${p[2]}%</text>` +
+        `<text x="${p[0].toFixed(1)}" y="${H - 8}" text-anchor="middle" class="ch-lab">T${i + 1}</text>`).join("") +
+      `</svg>`;
+  }
   const wt = weakTopics(5);
   $("perfBody").innerHTML = `
     <div class="stat-grid">
       <div class="stat"><div class="v">${tests}</div><small>दिए गए टेस्ट</small></div>
-      <div class="stat"><div class="v">${qs}</div><small>हल किए गए प्रश्न</small></div>
+      <div class="stat"><div class="v">${att}</div><small>हल किए गए प्रश्न</small></div>
       <div class="stat"><div class="v">${acc}%</div><small>औसत एक्यूरेसी</small></div>
-      <div class="stat"><div class="v">${avg}%</div><small>औसत स्कोर</small></div>
       <div class="stat"><div class="v">#${best}</div><small>वर्तमान रैंक</small></div>
       <div class="stat"><div class="v">🔥${getStreak()}</div><small>दिन की स्ट्रीक</small></div>
+      <div class="stat"><div class="v">${getXP()}</div><small>कुल XP</small></div>
     </div>
-    <h3 class="sec-title">📊 विषय प्रदर्शन</h3>
-    ${Object.keys(sub).length ? Object.keys(sub).map(s => {
-      const a = Math.round(sub[s].ok / sub[s].att * 100);
-      return `<div class="bar-row"><div class="bl"><span>${SUBJECTS[s] ? SUBJECTS[s].icon + " " + SUBJECTS[s].name : s}</span><span>${a}%</span></div>
-        <div class="bar"><div class="${a < 60 ? "low" : ""}" style="width:${a}%"></div></div></div>`;
-    }).join("") : "<p style='color:var(--mut)'>अभी कोई टेस्ट नहीं दिया।</p>"}
+    <h3 class="sec-title">📊 विषयवार एक्यूरेसी</h3>
+    ${barsSVG || "<p style='color:var(--mut)'>अभी कोई टेस्ट नहीं दिया।</p>"}
+    <h3 class="sec-title">📈 पिछले 7 टेस्ट का स्कोर ट्रेंड</h3>
+    ${trendSVG || "<p style='color:var(--mut)'>ट्रेंड के लिए कम से कम 2 टेस्ट दें।</p>"}
     <h3 class="sec-title">⚠️ कमज़ोर टॉपिक</h3>
     ${wt.length ? wt.map(t => `<div class="lb-row"><div class="lb-info"><b>⚠️ ${esc(t.topic)}</b><small>${SUBJECTS[t.subject] ? SUBJECTS[t.subject].name : t.subject} • ${t.acc}% एक्यूरेसी (${t.att} प्रयास)</small></div></div>`).join("") +
       `<button class="btn gold" onclick="startPractice({mode:'weak',count:25,title:'कमज़ोर टॉपिक अभ्यास'})">▶️ कमज़ोर टॉपिक अभ्यास</button>`
@@ -1556,9 +1790,8 @@ function renderCA() {
 window.caQuiz = function (i) {
   const qs = seededPick(QB.filter(q => q.subject === "ca").concat(QB), "ca" + i + todayKey(), 5);
   if (!qs.length) { toast("क्विज़ के प्रश्न नहीं मिले"); return; }
-  startPractice({ mode: "practice", count: 5, title: "CA Quiz" });
-  // override picked set
-  PR.qs = qs; PR.ans = new Array(qs.length).fill(-1); PR.ok = new Array(qs.length).fill(null); renderPR();
+  // banks ensure karke SYNCHRONOUS session banao — PR null race khatm
+  ensureBanks().then(() => startPracticeNow({ mode: "practice", count: 5, title: "CA Quiz", _qs: qs }));
 };
 
 // ============================================================
@@ -1583,6 +1816,7 @@ function pyqGo(mockMode) {
   if (!qs.length) qs = QB.slice();
   if (mockMode) {
     const ex = EXAMS[PYQ.exam];
+    killSession();
     MK = { qs: qs.slice(0, ex.total), ex, title: "📄 " + ex.name + " " + PYQ.year + " पैटर्न", i: 0, ans: new Array(Math.min(qs.length, ex.total)).fill(-1), mark: [], seen: [], t0: Date.now(), left: ex.mins * 60, timerId: null, qTime: [], qT0: Date.now() };
     MK.mark = new Array(MK.qs.length).fill(false); MK.seen = new Array(MK.qs.length).fill(false); MK.seen[0] = true; MK.qTime = new Array(MK.qs.length).fill(0);
     $("mkTitle").textContent = MK.title;
@@ -1642,6 +1876,8 @@ function renderProfile() {
     </div>`;
   $("profBody").innerHTML = loginSectionHTML(p) + headCard + `
     <div class="set-row"><span>🌐 भाषा</span><button class="chip ${p.lang === "hi" ? "on" : ""}" id="langTgl">${p.lang === "hi" ? "हिंदी" : "English"}</button></div>
+    <div class="set-row"><span>🔠 अक्षर आकार</span><span class="chip-row" style="margin:0">${[["small", "छोटा"], ["normal", "सामान्य"], ["large", "बड़ा"]].map(([v, l]) =>
+      `<button class="chip sm ${store.get("fsize", "normal") === v ? "on" : ""}" data-fs="${v}">${l}</button>`).join("")}</span></div>
     <div class="set-row"><span>🔔 नोटिफिकेशन</span><button class="switch ${p.notif ? "on" : ""}" id="notifTgl"></button></div>
     <div class="set-row"><span>🔒 प्राइवेसी मोड</span><button class="switch ${p.priv ? "on" : ""}" id="privTgl"></button></div>
     <button class="btn ghost" data-go="scr-performance">📈 प्रदर्शन</button>
@@ -1673,6 +1909,10 @@ function renderProfile() {
     };
   };
   $("langTgl").onclick = () => { const pp = U.profile; pp.lang = pp.lang === "hi" ? "en" : "hi"; U.profile = pp; renderProfile(); };
+  $$("#profBody [data-fs]").forEach(b => b.onclick = () => {
+    store.set("fsize", b.dataset.fs); applyFontSize(); renderProfile();
+    toast("🔠 अक्षर आकार: " + b.textContent);
+  });
   $("notifTgl").onclick = e => { const pp = U.profile; pp.notif = !pp.notif; U.profile = pp; e.target.classList.toggle("on", pp.notif); };
   $("privTgl").onclick = e => { const pp = U.profile; pp.priv = !pp.priv; U.profile = pp; e.target.classList.toggle("on", pp.priv); };
   $("btnUpdCheck").onclick = () => checkUpdate(true);
@@ -1697,8 +1937,9 @@ function renderSearch() {
       `<div class="glass card rev-q"><div class="rq">${esc(q.q)}</div><div style="font-size:13px;color:var(--green)">सही: ${esc(q.opts[q.ans])}</div>
        <div class="qacts"><button class="btn sm ghost" onclick="aiExplainById('${q.id}')">🤖 Explain</button>
        <button class="btn sm ghost" onclick="toggleBookmark('${q.id}')">🔖 सेव करें</button></div></div>`).join("");
-    const tHit = Array.from(new Set(QB.map(q => q.topic))).filter(t => t.toLowerCase().includes(s)).slice(0, 10);
-    if (tHit.length) html += `<h3 class="sec-title">Topics</h3><div class="chip-row">` + tHit.map(t => `<button class="chip" onclick="startPractice({topic:'${esc(t)}',subject:'all',count:10,mode:'practice',title:'${esc(t)}'})">${esc(t)}</button>`).join("") + `</div>`;
+    const tHit = Array.from(new Set(QB.map(q => q.topic))).filter(t => t && t.toLowerCase().includes(s)).slice(0, 10);
+    // quote-safe: topic data-attribute me (inline onclick me ' toot sakta tha)
+    if (tHit.length) html += `<h3 class="sec-title">Topics</h3><div class="chip-row">` + tHit.map(t => `<button class="chip" data-topic="${encodeURIComponent(t)}">${esc(t)}</button>`).join("") + `</div>`;
     const nHit = NOTES.filter(nt => nt.title.toLowerCase().includes(s) ||
       (nt.points || []).some(p => p.toLowerCase().includes(s)) ||
       (nt.qa || []).some(x => x[0].toLowerCase().includes(s) || x[1].toLowerCase().includes(s))).slice(0, 8);
@@ -1706,6 +1947,10 @@ function renderSearch() {
       `<div class="glass card rev-q"><div class="rq">${nt.icon || "📝"} <b>${esc(nt.title)}</b></div>
        <div class="qacts"><button class="btn sm gold" onclick="openNoteFromSearch('${nt.id}')">📖 खोलें</button></div></div>`).join("");
     $("searchRes").innerHTML = html || "<p style='color:var(--mut)'>कुछ नहीं मिला।</p>";
+    $$("#searchRes [data-topic]").forEach(b => b.onclick = () => {
+      const t = decodeURIComponent(b.dataset.topic);
+      startPractice({ topic: t, subject: "all", count: 10, mode: "practice", title: t });
+    });
   };
   box.oninput = doSearch;
 }
@@ -1735,6 +1980,16 @@ function applyTheme() {
   document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   const t = $("themeToggle"); if (t) t.textContent = dark ? "🌙" : "☀️";
 }
+// ============================================================
+// FONT SIZE (Phase 2) — chhota/normal/bada, turant lagu + persist
+// ============================================================
+const FSIZES = { small: 0.88, normal: 1, large: 1.15 };
+function applyFontSize() {
+  const v = store.get("fsize", "normal");
+  const z = FSIZES[v] || 1;
+  const app = $("app");
+  if (app) app.style.zoom = (z === 1 ? "" : String(z));
+}
 function toggleTheme() {
   const p = U.profile; p.dark = !(p.dark !== false); U.profile = p;
   applyTheme(); toast(p.dark ? "🌙 डार्क मोड" : "☀️ लाइट मोड");
@@ -1748,13 +2003,22 @@ function wire() {
   $("genClose").onclick = () => $("genModal").classList.add("hidden");
   $("btnStartPractice").onclick = () => startPractice({ subject: PS.subject, topic: PS.topic, count: PS.count, mode: PS.mode, title: "अभ्यास" });
   $("prPrev").onclick = () => { if (PR && PR.i > 0) { PR.i--; renderPR(); } };
-  $("prNext").onclick = () => { if (PR) { if (PR.i < PR.qs.length - 1) { PR.i++; renderPR(); } else finishPractice(); } };
-  $("prFinish").onclick = () => { if (PR && confirm("अभ्यास समाप्त करें?")) finishPractice(); };
+  $("prSkip").onclick = () => {
+    if (!PR) return;
+    if (PR.ans[PR.i] >= 0) { toast("✅ इसका उत्तर दे चुके हैं"); return; }
+    PR.skip[PR.i] = true;
+    PR.skipShown = false; // naya skip → finish par dobara poochho
+    toast("⏭ छोड़ा गया — अंत में पुनः प्रयास कर सकते हैं");
+    if (PR.i < PR.qs.length - 1) { PR.i++; renderPR(); } else finishPracticeFlow();
+  };
+  $("prNext").onclick = () => { if (PR) { if (PR.i < PR.qs.length - 1) { PR.i++; renderPR(); } else finishPracticeFlow(); } };
+  $("prFinish").onclick = () => { if (PR && confirm("अभ्यास समाप्त करें?")) finishPracticeFlow(); };
   $("btnStartMock").onclick = startMock;
   $("mkPrev").onclick = () => mkNav(-1);
   $("mkNext").onclick = () => mkNav(1);
   $("mkClear").onclick = () => { if (MK) { MK.ans[MK.i] = -1; renderMK(); } };
   $("mkMark").onclick = () => { if (MK) { MK.mark[MK.i] = !MK.mark[MK.i]; renderMK(); } };
+  $("mkReport").onclick = () => { if (MK) openReport(MK.qs[MK.i].id); };
   const mlb = $("mkLiveBtn");
   if (mlb) mlb.onclick = () => { const b = $("mkLiveBoard"); if (b) b.classList.toggle("hidden"); };
   $("mkSubmit").onclick = () => {
@@ -1805,6 +2069,7 @@ function bootMain() {
   __booted = true;
   wire();
   applyTheme();
+  applyFontSize();
   fbInit();
   fetchRemoteQB();
   checkNet();

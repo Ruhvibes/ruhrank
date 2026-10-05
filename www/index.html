@@ -72,9 +72,9 @@
       <p class="tagline">Practice • Compete • Rank</p>
       <p class="ob-sub">SSC, Railway, Banking, Bihar Police, BPSC, Defence — सब एक जगह</p>
       <div class="ob-stats">
-        <div class="ob-stat"><b>710</b><small>प्रश्न</small></div>
-        <div class="ob-stat"><b>17</b><small>परीक्षाएं</small></div>
-        <div class="ob-stat"><b>6</b><small>विषय</small></div>
+        <div class="ob-stat"><b>6000+</b><small>प्रश्न</small></div>
+        <div class="ob-stat"><b>19</b><small>परीक्षाएं</small></div>
+        <div class="ob-stat"><b>7</b><small>विषय</small></div>
         <div class="ob-stat"><b>🤖</b><small>AI हेल्प</small></div>
       </div>
     </div>
@@ -107,6 +107,10 @@
       <div class="row2">
         <div class="glass card mini" data-go="scr-notes" style="cursor:pointer"><div class="m-ico">📝</div><b>दरोगा नोट्स</b><small style="color:var(--mut)">टॉपिक-wise revision</small></div>
         <div class="glass card mini" data-go="scr-syllabus" style="cursor:pointer"><div class="m-ico">📋</div><b>सिलेबस ट्रैकर</b><small style="color:var(--mut)">प्रगति देखें</small></div>
+      </div>
+      <div class="row2">
+        <div class="glass card mini" data-go="scr-studyplan" style="cursor:pointer"><div class="m-ico">🗓️</div><b>30-दिवसीय योजना</b><small style="color:var(--mut)">परीक्षा की तैयारी</small></div>
+        <div class="glass card mini" data-go="scr-performance" style="cursor:pointer"><div class="m-ico">📈</div><b>प्रदर्शन</b><small style="color:var(--mut)">एनालिटिक्स देखें</small></div>
       </div>
       <h3 class="sec-title">📚 लोकप्रिय परीक्षाएँ</h3>
       <div id="homeExams" class="exam-grid"></div>
@@ -153,10 +157,13 @@
         <div id="prExp" class="exp hidden"></div>
         <div class="qacts">
           <button class="btn ghost sm" id="prExplain">🤖 Explain</button>
+          <button class="btn ghost sm" id="prReport">⚠️ रिपोर्ट</button>
         </div>
       </div>
+      <div class="palette horiz" id="prPalette"></div>
       <div class="qnav">
         <button class="btn ghost" id="prPrev">← पिछला</button>
+        <button class="btn ghost" id="prSkip">⏭ छोड़ें</button>
         <button class="btn gold" id="prNext">अगला →</button>
       </div>
       <button class="btn danger ghost" id="prFinish">⏹️ अभ्यास समाप्त करें</button>
@@ -202,6 +209,7 @@
         </div>
         <div class="qnav">
           <button class="btn warn" id="mkMark">🚩 रिव्यू हेतु चिह्नित करें</button>
+          <button class="btn ghost" id="mkReport" title="गलती रिपोर्ट करें">⚠️</button>
           <button class="btn danger" id="mkSubmit">✅ टेस्ट सबमिट करें</button>
         </div>
       </div>
@@ -211,8 +219,31 @@
 
   <!-- ============ RESULT ============ -->
   <section class="screen" id="scr-result">
-    <header class="topbar"><div class="brand">📊 <b>Result</b></div><div></div><div></div></header>
+    <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">📊 <b>Result</b></div><div></div></header>
     <div class="scroll" id="resultBody"></div>
+  </section>
+
+  <!-- ============ REVIEW (answer review) ============ -->
+  <section class="screen" id="scr-review">
+    <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">📝 <b>उत्तर समीक्षा</b></div><div></div></header>
+    <div class="scroll">
+      <div class="chip-row" id="revChips"></div>
+      <div id="revList"></div>
+      <div class="row2">
+        <button class="btn ghost" id="revBackRes">← परिणाम</button>
+        <button class="btn gold" id="revHome">🏠 होम</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STUDY PLAN (30-day) ============ -->
+  <section class="screen" id="scr-studyplan">
+    <header class="topbar"><button class="icon-btn" data-back>←</button><div class="brand">🗓️ <b>30-दिवसीय योजना</b></div><div></div></header>
+    <div class="scroll">
+      <div class="chip-row" id="spExams"></div>
+      <div class="glass card" id="spProg"></div>
+      <div id="spDays"></div>
+    </div>
   </section>
 
   <!-- ============ LEADERBOARD ============ -->
@@ -332,6 +363,7 @@
   </nav>
 </div>
 
+<script src="studyplan.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

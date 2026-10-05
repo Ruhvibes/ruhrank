@@ -76,6 +76,16 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---- reports (user reports about wrong questions/issues) ----
+    // create: signed-in user, only own reports; read: own or admin; update/delete: admin only
+    match /reports/{doc} {
+      allow read: if request.auth != null
+        && (request.auth.uid == resource.data.uid || isAdmin());
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.uid;
+      allow update, delete: if isAdmin();
+    }
+
     // ---- bookmarks: private per user ----
     match /bookmarks/{uid} {
       allow read, write: if request.auth != null
