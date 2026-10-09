@@ -124,7 +124,7 @@ var HN_BIHAR_GK = {
      }
     }
    ],
-   "title": "Chapter 1: प्राचीन बिहार — मगध साम्राज्य"
+   "title": "अध्याय 1: प्राचीन बिहार — मगध साम्राज्य"
   },
   {
    "sections": [
@@ -166,7 +166,7 @@ var HN_BIHAR_GK = {
      ]
     }
    ],
-   "title": "Chapter 2: मध्यकालीन बिहार"
+   "title": "अध्याय 2: मध्यकालीन बिहार"
   },
   {
    "sections": [
@@ -259,7 +259,7 @@ var HN_BIHAR_GK = {
      }
     }
    ],
-   "title": "Chapter 3: आधुनिक बिहार — स्वतंत्रता संग्राम"
+   "title": "अध्याय 3: आधुनिक बिहार — स्वतंत्रता संग्राम"
   },
   {
    "sections": [
@@ -343,7 +343,7 @@ var HN_BIHAR_GK = {
      ]
     }
    ],
-   "title": "Chapter 4: बिहार का भूगोल — नदियाँ"
+   "title": "अध्याय 4: बिहार का भूगोल — नदियाँ"
   },
   {
    "sections": [
@@ -402,7 +402,7 @@ var HN_BIHAR_GK = {
      ]
     }
    ],
-   "title": "Chapter 5: बिहार का भूगोल — जिले और खनिज"
+   "title": "अध्याय 5: बिहार का भूगोल — जिले और खनिज"
   },
   {
    "sections": [
@@ -468,7 +468,7 @@ var HN_BIHAR_GK = {
      }
     }
    ],
-   "title": "Chapter 6: बिहार की राजनीति"
+   "title": "अध्याय 6: बिहार की राजनीति"
   },
   {
    "sections": [
@@ -498,7 +498,7 @@ var HN_BIHAR_GK = {
      ]
     }
    ],
-   "title": "Chapter 7: बिहार की अर्थव्यवस्था"
+   "title": "अध्याय 7: बिहार की अर्थव्यवस्था"
   },
   {
    "sections": [
@@ -579,7 +579,7 @@ var HN_BIHAR_GK = {
      }
     }
    ],
-   "title": "Chapter 8: बिहार की संस्कृति"
+   "title": "अध्याय 8: बिहार की संस्कृति"
   },
   {
    "sections": [
@@ -621,7 +621,7 @@ var HN_BIHAR_GK = {
      ]
     }
    ],
-   "title": "Chapter 9: बिहार — विविध तथ्य"
+   "title": "अध्याय 9: बिहार — विविध तथ्य"
   },
   {
    "sections": [
@@ -665,10 +665,10 @@ var HN_BIHAR_GK = {
      }
     }
    ],
-   "title": "Chapter 10: बिहार GK — Quick Revision"
+   "title": "अध्याय 10: बिहार GK — Quick Revision"
   },
   {
-   "title": "Chapter 11: बिहार के जिले और प्रमंडल",
+   "title": "अध्याय 11: बिहार के जिले और प्रमंडल",
    "sections": [
     {
      "heading": "9 प्रमंडल (Divisions)",
@@ -763,7 +763,7 @@ var HN_BIHAR_GK = {
    ]
   },
   {
-   "title": "Chapter 12: बिहार की महान हस्तियाँ",
+   "title": "अध्याय 12: बिहार की महान हस्तियाँ",
    "sections": [
     {
      "heading": "राष्ट्रीय नेता",
@@ -797,7 +797,7 @@ var HN_BIHAR_GK = {
    ]
   },
   {
-   "title": "Chapter 13: बिहार में खेल और पुरस्कार",
+   "title": "अध्याय 13: बिहार में खेल और पुरस्कार",
    "sections": [
     {
      "heading": "खेल",
@@ -827,7 +827,7 @@ var HN_BIHAR_GK = {
    ]
   },
   {
-   "title": "Chapter 14: बिहार — प्रशासन और अर्थव्यवस्था",
+   "title": "अध्याय 14: बिहार — प्रशासन और अर्थव्यवस्था",
    "sections": [
     {
      "heading": "प्रशासनिक तथ्य",
@@ -858,7 +858,7 @@ var HN_BIHAR_GK = {
    ]
   },
   {
-   "title": "Chapter 15: बिहार GK — विविध तथ्य",
+   "title": "अध्याय 15: बिहार GK — विविध तथ्य",
    "sections": [
     {
      "heading": "एक नज़र में बिहार",

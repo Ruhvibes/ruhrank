@@ -72,7 +72,7 @@ var HN_INDIAN_POLITY = {
      ]
     }
    ],
-   "title": "Chapter 1: संविधान का निर्माण"
+   "title": "अध्याय 1: संविधान का निर्माण"
   },
   {
    "sections": [
@@ -169,7 +169,7 @@ var HN_INDIAN_POLITY = {
      ]
     }
    ],
-   "title": "Chapter 2: मौलिक अधिकार और कर्तव्य"
+   "title": "अध्याय 2: मौलिक अधिकार और कर्तव्य"
   },
   {
    "sections": [
@@ -246,7 +246,7 @@ var HN_INDIAN_POLITY = {
      ]
     }
    ],
-   "title": "Chapter 3: संघ और राज्य कार्यपालिका"
+   "title": "अध्याय 3: संघ और राज्य कार्यपालिका"
   },
   {
    "sections": [
@@ -290,7 +290,7 @@ var HN_INDIAN_POLITY = {
      ]
     }
    ],
-   "title": "Chapter 4: न्यायपालिका और चुनाव आयोग"
+   "title": "अध्याय 4: न्यायपालिका और चुनाव आयोग"
   },
   {
    "sections": [
@@ -363,7 +363,7 @@ var HN_INDIAN_POLITY = {
      ]
     }
    ],
-   "title": "Chapter 5: संविधान संशोधन"
+   "title": "अध्याय 5: संविधान संशोधन"
   },
   {
    "sections": [
@@ -393,7 +393,7 @@ var HN_INDIAN_POLITY = {
      ]
     }
    ],
-   "title": "Chapter 6: स्थानीय शासन"
+   "title": "अध्याय 6: स्थानीय शासन"
   },
   {
    "sections": [
@@ -423,7 +423,7 @@ var HN_INDIAN_POLITY = {
      ]
     }
    ],
-   "title": "Chapter 7: आपातकाल और केंद्र-राज्य संबंध"
+   "title": "अध्याय 7: आपातकाल और केंद्र-राज्य संबंध"
   },
   {
    "sections": [
@@ -483,10 +483,10 @@ var HN_INDIAN_POLITY = {
      }
     }
    ],
-   "title": "Chapter 8: विविध — Quick Revision"
+   "title": "अध्याय 8: विविध — Quick Revision"
   },
   {
-   "title": "Chapter 9: संसद (Parliament)",
+   "title": "अध्याय 9: संसद (Parliament)",
    "sections": [
     {
      "heading": "लोकसभा और राज्यसभा",
@@ -529,6 +529,16 @@ var HN_INDIAN_POLITY = {
         "उपराष्ट्रपति"
        ]
       ]
+     },
+     "image": {
+      "type": "flow",
+      "steps": [
+       "विधेयक पेश",
+       "चर्चा व मतदान",
+       "दूसरा सदन",
+       "राष्ट्रपति की मंजूरी",
+       "कानून"
+      ]
      }
     },
     {
@@ -547,7 +557,7 @@ var HN_INDIAN_POLITY = {
    ]
   },
   {
-   "title": "Chapter 10: संवैधानिक निकाय",
+   "title": "अध्याय 10: संवैधानिक निकाय",
    "sections": [
     {
      "heading": "चुनाव आयोग और अन्य आयोग",
@@ -608,7 +618,7 @@ var HN_INDIAN_POLITY = {
    ]
   },
   {
-   "title": "Chapter 11: चुनाव प्रणाली",
+   "title": "अध्याय 11: चुनाव प्रणाली",
    "sections": [
     {
      "heading": "चुनाव प्रक्रिया",
@@ -640,7 +650,7 @@ var HN_INDIAN_POLITY = {
    ]
   },
   {
-   "title": "Chapter 12: राजनीतिक दल और दबाव समूह",
+   "title": "अध्याय 12: राजनीतिक दल और दबाव समूह",
    "sections": [
     {
      "heading": "राष्ट्रीय और राज्य दल",
