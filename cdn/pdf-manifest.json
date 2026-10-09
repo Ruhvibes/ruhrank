@@ -1,0 +1,9 @@
+{
+  "updated": "2026-10-09",
+  "pdfs": [
+    { "id": "pdf-bihar-gk", "title": "Bihar GK Complete Notes", "cat": "Bihar GK", "file": "pdfs/bihar-gk.pdf", "pages": 45, "size": "2.1 MB", "color": "#e74c3c" },
+    { "id": "pdf-polity", "title": "Indian Polity Notes", "cat": "Polity", "file": "pdfs/indian-polity.pdf", "pages": 38, "size": "1.8 MB", "color": "#3498db" },
+    { "id": "pdf-history", "title": "Modern History Notes", "cat": "History", "file": "pdfs/modern-history.pdf", "pages": 42, "size": "2.0 MB", "color": "#f39c12" },
+    { "id": "pdf-science", "title": "General Science Notes", "cat": "Science", "file": "pdfs/general-science.pdf", "pages": 50, "size": "2.4 MB", "color": "#27ae60" }
+  ]
+}
