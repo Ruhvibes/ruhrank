@@ -1,1 +1,10 @@
-{"apkUrl":"https://github.com/Ruhvibes/ruhrank/releases/download/v1/RuhRank.apk","appDisabled":false,"disabledMessage_hi":"रखरखाव कार्य चल रहा है। कृपया कुछ समय बाद पुनः प्रयास करें।","disabledTitle_hi":"सेवा अस्थायी रूप से बंद है","notes_hi":"RuhRank 1.0 — PDFs me images + sahi Hindi!","releasedAt":1791573600000,"versionCode":21,"versionName":"1.0"}
+{
+ "apkUrl": "https://github.com/Ruhvibes/ruhrank/releases/download/v1/RuhRank.apk",
+ "appDisabled": false,
+ "disabledMessage_hi": "रखरखाव कार्य चल रहा है। कृपया कुछ समय बाद पुनः प्रयास करें।",
+ "disabledTitle_hi": "सेवा अस्थायी रूप से बंद है",
+ "notes_hi": "RuhRank 1.0 — PDF download fix, notification fix, leaderboard daily/weekly/monthly, sahi Hindi PDFs!",
+ "releasedAt": 1791573600000,
+ "versionCode": 22,
+ "versionName": "1.0"
+}
