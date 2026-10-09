@@ -27,6 +27,23 @@
     </script>
   (Copy it from Firebase console → Project settings → Your apps → Web app.)
 -->
+<script>
+/* FIX v11: content:// origin pe indexedDB.open() HANG karta hai (kabhi resolve nahi hota).
+   Firebase Auth + Heartbeats har request se pehle iska test karte hain -> login atak jata hai.
+   `let` se bare `indexedDB` references shadow ho jate hain -> SDK turant skip kar deta hai. */
+let indexedDB = undefined;
+try { Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true, writable: true }); } catch(e) {}
+/* FIX v11: Firebase mobile browser pe login se PEHLE ek auth iframe kholne ki koshish
+   karta hai (_shouldInitProactively), jo content:// pe hang ho jata hai aur har
+   auth operation ko rok deta hai. Desktop UA se ye init skip hota hai.
+   (Is panel me sirf email/password login hai - popup/redirect ki zaroorat nahi.) */
+try {
+  Object.defineProperty(navigator, 'userAgent', {
+    value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    configurable: true
+  });
+} catch(e) {}
+</script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -131,6 +148,19 @@ footer{text-align:center; color:var(--dim); font-size:12px; padding:24px}
     <button class="btn ghost small" id="authBtn" onclick="toggleAuth()">Sign in</button>
   </div>
 </header>
+<div id="sysStatus" style="max-width:640px;margin:16px auto;padding:12px 16px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--dim)">System check ho raha hai...</div>
+<div id="loginCard" class="hidden" style="max-width:420px;margin:24px auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:16px">
+  <h3 style="margin-bottom:12px">Admin sign in</h3>
+  <input id="loginEmail" type="email" placeholder="Admin email" autocomplete="username"
+    style="width:100%;padding:12px;margin-bottom:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--txt);font-size:16px">
+  <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password"
+    style="width:100%;padding:12px;margin-bottom:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--txt);font-size:16px">
+  <button class="btn" style="width:100%;padding:12px" onclick="doEmailSignIn()">Sign in</button>
+  <div id="loginErr" style="color:var(--red);margin-top:10px;font-size:14px"></div>
+  <button class="btn ghost small" style="margin-top:8px" onclick="runConnTest()">Connection test karo</button>
+  <div id="diagBox" style="margin-top:10px;font-size:13px;color:var(--dim);white-space:pre-wrap"></div>
+</div>
+
 
 <main>
   <!-- ================= DASHBOARD ================= -->
@@ -285,7 +315,7 @@ footer{text-align:center; color:var(--dim); font-size:12px; padding:24px}
   </section>
 </main>
 
-<footer>Made for Hasnain • RuhRank Admin • writes require Firebase admin sign-in (see firestore.rules)</footer>
+<footer>Made for Hasnain • RuhRank Admin • <b style='color:var(--green)'>v11</b> • writes require Firebase admin sign-in</footer>
 
 <script>
 /* ================================================================
@@ -295,7 +325,7 @@ footer{text-align:center; color:var(--dim); font-size:12px; padding:24px}
       the REAL protection is firestore.rules: only your Firebase Auth
       admin UID can write. This gate just keeps casual visitors out.)
    ================================================================ */
-const ADMIN_PANEL_PASSWORD = "ruhrank2026"; // <-- change me
+const ADMIN_PANEL_PASSWORD="changeme"; // <-- change me
 
 /* ================================================================
    2) Firebase config — Hasnain will inject real config.
@@ -316,7 +346,7 @@ let tSel = new Set(); // selected question ids for test builder
 /* ---------------- password gate ---------------- */
 function unlockGate(){
   const v = document.getElementById('gatePass').value;
-  if(v === ADMIN_PANEL_PASSWORD){
+  if(true){ // gate disabled 2026-10-08 — Hasnain found phone typing painful; real security is firestore.rules UID check
     document.getElementById('gate').style.display = 'none';
     initApp();
   } else {
@@ -334,33 +364,92 @@ function showTab(name){
 
 /* ---------------- init ---------------- */
 function initApp(){
-  buildExamCheckboxes(); buildExamSelect();
-  if(!firebaseConfig.apiKey){
-    document.getElementById('cfgWarn').classList.remove('hidden');
-    return;
+  const setStatus = (t)=>{ const el=document.getElementById('sysStatus'); if(el) el.innerHTML=t; };
+  try{
+    buildExamCheckboxes(); buildExamSelect();
+    const sdkOk = (typeof firebase !== 'undefined');
+    const cfgOk = !!(typeof firebaseConfig !== 'undefined' && firebaseConfig.apiKey && firebaseConfig.apiKey !== '...');
+    if(!sdkOk){
+      setStatus('SDK: &#10060; &nbsp; Config: ? &nbsp; Auth: &#10060;');
+      document.getElementById('loginErr').textContent='Firebase SDK load nahi hua — internet check karo, page reload karo.';
+      document.getElementById('loginCard').classList.remove('hidden');
+      return;
+    }
+    if(!cfgOk){
+      setStatus('SDK: &#9989; &nbsp; Config: &#10060; nakli &nbsp; Auth: &#10060;');
+      document.getElementById('loginErr').textContent='PURANI FILE khuli hai — nayi v11 file kholo!';
+      document.getElementById('loginCard').classList.remove('hidden');
+      return;
+    }
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore(); auth = firebase.auth();
+    auth.onAuthStateChanged(u=>{
+      authed = !!u;
+      const b = document.getElementById('authBadge');
+      b.textContent = u ? ('Signed in: '+u.email) : 'Not signed in';
+      b.className = 'badge ' + (u ? 'on' : 'off');
+      document.getElementById('authBtn').textContent = u ? 'Sign out' : 'Sign in';
+    });
+    setStatus('SDK: &#9989; &nbsp; Config: &#9989; asli &nbsp; Auth: &#9989; ready &nbsp; <b style="color:var(--green)">v11</b>');
+    loadStats(); loadQuestions(); loadTests(); loadCompetitions(); loadNotifications();
+  }catch(e){
+    const el=document.getElementById('sysStatus'); if(el) el.innerHTML='&#10060; <b>Init error:</b> '+e.message;
+    document.getElementById('loginErr').textContent='Init error: '+e.message;
+    document.getElementById('loginCard').classList.remove('hidden');
   }
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore();
-  auth = firebase.auth();
-  auth.onAuthStateChanged(u=>{
-    authed = !!u;
-    const b = document.getElementById('authBadge');
-    b.textContent = u ? ('Signed in: '+u.email) : 'Not signed in';
-    b.className = 'badge ' + (u ? 'on' : 'off');
-    document.getElementById('authBtn').textContent = u ? 'Sign out' : 'Sign in';
-  });
-  loadStats(); loadQuestions(); loadTests(); loadCompetitions(); loadNotifications();
 }
 
 /* ---------------- auth (email/password — admin only) ---------------- */
 function toggleAuth(){
   if(!auth){ alert('Firebase not configured yet.'); return; }
   if(auth.currentUser){ auth.signOut(); return; }
-  const email = prompt('Admin email:');
-  if(!email) return;
-  const pass = prompt('Admin password:');
-  if(!pass) return;
-  auth.signInWithEmailAndPassword(email, pass).catch(e=>alert('Sign-in failed: '+e.message));
+  const c = document.getElementById('loginCard');
+  c.classList.toggle('hidden');
+  document.getElementById('loginErr').textContent = '';
+}
+async function doEmailSignIn(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const errBox = document.getElementById('loginErr');
+  errBox.textContent = '';
+  if(!email || !pass){ errBox.textContent = 'Email aur password dono likho.'; return; }
+  if(!auth){ errBox.textContent = 'Auth ready nahi hai — page reload karo.'; return; }
+  errBox.style.color = 'var(--dim)';
+  errBox.textContent = 'Signing in...';
+  try{
+    // FIX (v11): content:// viewer me SDK ka storage hang karta hai — memory-only mode
+    await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+  }catch(e){ /* agar ye bhi fail ho to aage badho, login try karo */ }
+  const timeout = new Promise((_, rej)=>setTimeout(()=>rej(new Error('TIMEOUT: 30 second me server se jawab nahi aaya.')), 30000));
+  try{
+    await Promise.race([auth.signInWithEmailAndPassword(email, pass), timeout]);
+    document.getElementById('loginCard').classList.add('hidden');
+  }catch(e){
+    errBox.style.color = 'var(--red)';
+    errBox.textContent = 'Sign-in failed: ' + e.message;
+  }
+}
+async function runConnTest(){
+  const box = document.getElementById('diagBox');
+  const lines = [];
+  lines.push('SDK loaded: ' + (typeof firebase !== 'undefined' ? 'HAAN' : 'NAHI'));
+  lines.push('Config: ' + (firebaseConfig.apiKey && firebaseConfig.apiKey !== '...' ? 'HAAN (asli)' : 'NAHI (nakli/purani file)'));
+  lines.push('Auth object: ' + (auth ? 'HAAN' : 'NAHI'));
+  lines.push('Page URL: ' + location.protocol + '//' + location.host);
+  box.textContent = lines.join('\n') + '\n\nServer test ho raha hai...';
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>ctrl.abort(), 20000);
+    const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + firebaseConfig.apiKey,
+      {method:'POST', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({email:'test@invalid.local', password:'x', returnSecureToken:true}),
+       signal: ctrl.signal});
+    clearTimeout(t);
+    const j = await r.json();
+    box.textContent = lines.join('\n') + '\n\nServer test: JAWAB AAYA ✅\n(' + (j.error ? j.error.message : 'ok') + ')\nMatlab network sahi hai — phir se Sign in dabao.';
+  } catch(e) {
+    box.textContent = lines.join('\n') + '\n\nServer test: JAWAB NAHI AAYA ❌\n(' + e.message + ')\nViewer network block kar raha hai — file ko Chrome me kholo.';
+  }
 }
 function needAuth(){
   if(!authed){ alert('⚠️ Pehle "Sign in" karo (top-right) — writes need admin login.'); return false; }
@@ -620,7 +709,7 @@ async function sendNotification(){
   const message = document.getElementById('nMsg').value.trim();
   if(!title || !message){ alert('Title and message required.'); return; }
   try{
-    await db.collection('notifications').add({title, message, ts: Date.now()});
+    await db.collection('notifications').add({title, body: message, ts: Date.now()});
     document.getElementById('nTitle').value=''; document.getElementById('nMsg').value='';
     loadNotifications(); alert('📤 Notification queued — app will show it on next launch.');
   }catch(e){ alert('Send failed: '+e.message); }
@@ -631,7 +720,7 @@ async function loadNotifications(){
   document.getElementById('nTable').innerHTML = s.docs.map(d=>{
     const n = d.data();
     return `<tr>
-      <td>${esc(n.title)}</td><td class="q-text">${esc(n.message)}</td>
+      <td>${esc(n.title)}</td><td class="q-text">${esc(n.body || n.message)}</td>
       <td>${new Date(n.ts).toLocaleString('en-IN')}</td>
       <td><button class="btn small danger" onclick="delDoc('notifications','${d.id}',loadNotifications)">Delete</button></td>
     </tr>`;
